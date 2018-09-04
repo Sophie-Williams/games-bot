@@ -20,9 +20,8 @@ function sendHelp(message, args) {
 		if (commands.hasOwnProperty(args[0])) {
 			let cmd = commands[args[0]];
 			let help = new RichEmbed()
-				.setTitle(`${args[0]}`)
-				.setDescription(cmd.desc)
-				.addField('Example', prefix + cmd.usage);
+				.setTitle(`${cmd.usage}`)
+				.setDescription(cmd.desc);
 			
 			let options = [];
 			if (cmd.options) {

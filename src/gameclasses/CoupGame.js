@@ -7,6 +7,7 @@ const shuffle = require('../internal/shuffle.js');
 module.exports = {
 	cmd: 'coup',
 	desc: 'Plays coup',
+	options: {},
 	gameClass: CoupGame
 };
 

@@ -1,5 +1,6 @@
 module.exports = {
 	desc: 'Tests reactions',
+	level: 1,
 	run: testReactions
 };
 
