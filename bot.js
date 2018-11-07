@@ -13,8 +13,9 @@ dotenv.load();
 
 let prefix = process.env.DEFAULT_PREFIX || '.';
 
+// load in the logger and the database
 require('./src/internal/logger.js');
-// require('./dbconn.js');
+const mongodb = require('./dbconn.js');
 
 global.logger.info('Initializing client');
 const bot = new Client();
@@ -24,30 +25,7 @@ global.bot = bot;
 bot.on('ready', () => {
   global.logger.info(`${bot.user.username} is connected.`);
   bot.user.setActivity('with my board games', { type: 'PLAYING' });
-
-  /*
-	 * Initializes the non-permanent servers, where data about games are stored.
-	 * The hierarchy of data looks like this (example):
-	 * 			              servers
-	 * 	    /-------------------^  ^--------------------\
-	 *  games: {0: object Game, 1: object Game}      players: {user ID: [0, 2]}
-	 *           \                                                      /
-	 *            \----------------------------------------------------/
-	 */
-  global.servers = {};
-  bot.guilds.forEach((guild, guildID) => {
-    global.servers[guildID] = {
-      games: {},
-      players: {}
-    };
-
-    // dbconn.initTable(guildID);
-
-    bot.guilds.get(guildID).members.forEach((member, playerID) => {
-      global.servers[guildID].players[playerID] = {};
-      // dbconn.initPlayer(guildID, playerID);
-    });
-  });
+  mongodb.initServers();
 });
 
 /*
@@ -55,7 +33,7 @@ bot.on('ready', () => {
  * it will run the command they type
  */
 let args, cmd;
-bot.on('message', async (message) => {
+bot.on('message', message => {
   if (message.author.bot) return;
   if (message.channel.type !== 'text') return;
 
@@ -75,29 +53,20 @@ bot.on('message', async (message) => {
   }
 });
 
-function pruneEndedGames() {
-  Object.values(global.servers).forEach(server => {
-    for (let gameID of Object.getOwnPropertyNames(server.games))
-      if (server.games[gameID].status === 'ended')
-        delete server[gameID];
-  });
-}
+// bot.on('guildMemberAdd', () => {
+// });
+// bot.on('guildMemberRemove', () => {
+// });
 
 bot.login(process.env.BOT_TOKEN);
-let handle = setInterval(pruneEndedGames, 5*60*1000);
 
 /*
  * This exit handler simply makes sure the program terminates gracefully when
  * it is killed, nodemon restarts, or an error occurs.
  */
 let exitHandler = function (exitCode) {
-  // global.dbconn.end((err) => {
-  //   if (err) throw err;
-  //   global.logger.info('Mysql connection ended');
-  // });
-
-  clearInterval(handle);
-  global.logger.info('Interval cleared');
+  mongodb.closeDB();
+  global.logger.info('MongoDB closed');
   if (exitCode !== undefined) global.logger.info(exitCode);
   process.exit();
 };
@@ -105,4 +74,7 @@ let exitHandler = function (exitCode) {
 process.on('SIGINT', exitHandler);
 process.on('SIGUSR1', exitHandler);
 process.on('SIGUSR2', exitHandler);
-process.on('uncaughtException', exitHandler);
+process.on('uncaughtException', e => {
+  global.logger.info(e.stack);
+  exitHandler('uncaughtException');
+});
