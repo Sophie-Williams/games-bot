@@ -55,6 +55,34 @@ Game.prototype.end = function () {
   global.db.collection(this.channel.guild.id).deleteOne({ _id: this.id });
 };
 
+Game.prototype.addPlayer = function (userID, otherProperties) {
+  this.players[userID] = {
+    id: userID,
+    game: this,
+    user: global.bot.users.get(userID),
+    playing: true,
+    leaveGame: function () {
+      this.game.channel.send(`${this.user} has left the game!`);
+		
+      // Deletes this game from the player's list of games. Remember, this still references the game
+      let gamesList = global.servers[this.game.channel.guild.id].players[this.id];
+      gamesList.splice(gamesList.indexOf(this.id), 1);
+
+      this.playing = false;
+      // This later gets destroyed by the interval initiated in bot.js
+    }
+  };
+  Object.assign(this.players[userID], otherProperties);
+
+  // Adds this game's ID to the player's list of games
+  global.servers[this.channel.guild.id].players[userID][this.command] = this.id;
+  return this.players[userID];
+};
+
+Game.prototype.update = function() {
+  global.db.connection(this.channel.guild.id).update({_id: this._id}, this);
+}
+
 // Static functions
 // const defaultOptions = {
 // 	leave: {
