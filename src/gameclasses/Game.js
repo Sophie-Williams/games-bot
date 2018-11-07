@@ -10,7 +10,7 @@ module.exports = Game;
 
 // All of the actions are called with the game as the object. Parameters: (message, index, args)
 function Game(id, channel, command) {
-  this.id = id;
+  this._id = id;
   this.channel = channel;
   this.command = command;
   this.players = {};
@@ -24,30 +24,6 @@ Game.prototype.init = function (message, args) {
   for (let i = 0; i < args.length; i++)
     if (opts.includes(args[i]))
       commands[this.command].options[args[i]].action.call(this, message, i, args);
-};
-
-Game.prototype.addPlayer = function (userID, otherProperties) {
-  this.players[userID] = {
-    id: userID,
-    game: this,
-    user: global.bot.users.get(userID),
-    playing: true,
-    leaveGame: function () {
-      this.game.channel.send(`${this.user} has left the game!`);
-		
-      // Deletes this game from the player's list of games. Remember, this still references the game
-      let gamesList = global.servers[this.game.channel.guild.id].players[this.id];
-      gamesList.splice(gamesList.indexOf(this.id), 1);
-
-      this.playing = false;
-      // This later gets destroyed by the interval initiated in bot.js
-    }
-  };
-  Object.assign(this.players[userID], otherProperties);
-
-  // Adds this game's ID to the player's list of games
-  global.servers[this.channel.guild.id].players[userID][this.command] = this.id;
-  return this.players[userID];
 };
 
 /*
@@ -73,11 +49,10 @@ Game.prototype.sendCollectorEndedMessage = function (reason) {
 /*
  * Deletes the game and removes it from its players' lists.
  */
-Game.prototype.end = async function () {
-  this.players.forEach(player => player.leaveGame());
+Game.prototype.end = function () {
   this.status = 'ended';
-  await this.channel.send(`${Object.values(this.players).map(p => p.user).join(', ')}, your ${this.type} games have ended.`).catch(global.logger.error);
-  // delete global.servers[this.channel.guild.id].games[this.id];
+  this.channel.send(`${this.playerIDs.map(playerID => global.bot.users.get(playerID)).join(', ')}, your ${this.type} games have ended.`).catch(global.logger.error);
+  global.db.collection(this.channel.guild.id).deleteOne({ _id: this.id });
 };
 
 // Static functions

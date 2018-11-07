@@ -15,7 +15,7 @@ let prefix = process.env.DEFAULT_PREFIX || '.';
 
 // load in the logger and the database
 require('./src/internal/logger.js');
-const mongodb = require('./dbconn.js');
+const mongodb = require('./src/internal/mongodb.js');
 
 global.logger.info('Initializing client');
 const bot = new Client();

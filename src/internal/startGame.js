@@ -1,32 +1,32 @@
 'use strict';
 
-let commands;
+const commands = require('./getCommands.js');
 
 /*
  * This function simply starts the game. It is called when a player types the prefix followed by
  * the name of the game.
+ * @param gameClass the game class that the user is trying to create, e.x. TicTacToeGame
  */
-
 module.exports = async function (message, args, gameClass) {
-  let server = global.servers[message.guild.id];
-
   // If the player is already in a game, see if they call any arguments
-  let playerGameID = server.players[message.author.id][gameClass.type];
-  let argsPassed = false;
-  if (playerGameID) {
-    let playerGame = server.games[playerGameID];
-    commands = (require('./getCommands.js'))();
+  let server = global.db.collection(message.guild.id);
+  let playerGameID = server.find({ _id: message.author.id })[gameClass.cmd];
+
+  if (playerGameID) { // If the game that he is trying to start already exists
+    let playerGame = server.find({ _id: playerGameID });
+    let argsPassed = false;
     for (let i = 0; i < args.length; i++) {
-      if (commands[playerGame.command].options.hasOwnProperty(args[i])) {
+      if (commands[gameClass.cmd].options.hasOwnProperty(args[i])) { // If the game class that the user is trying to instantiate
         args[i].action.call(playerGame, message, args);
         argsPassed = true;
+        server.update({ _id: message.author.id }, playerGame);
       }
     }
-    if (argsPassed) return;
-    return playerGame.channel.send(`You are already in a game! Type ${process.env.DEFAULT_PREFIX}${playerGame.type} view to resend the message.`).catch(global.logger.error);
+    if (!argsPassed) playerGame.channel.send(`You are already in a game! Type ${process.env.DEFAULT_PREFIX || '.'}${playerGame.type} view to resend the message.`).catch(global.logger.error);
+  } else {
+    let gameID = Math.random().toString(36).substr(2, 9);
+    let newGame = new gameClass(gameID, message.channel);
+    newGame.init(message, args);
+    server.insertOne(newGame);
   }
-
-  let id = Math.random().toString(36).substr(2, 9);
-  server.games[id] = new gameClass(id, message.channel);
-  server.games[id].init(message, args);
 };
