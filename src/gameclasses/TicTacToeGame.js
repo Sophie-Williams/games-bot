@@ -45,11 +45,14 @@ module.exports = {
   gameClass: TicTacToeGame
 };
 
-function TicTacToeGame (id, channel) {
-  Game.call(this, id, channel, 'tictactoe');
-  this.numPlayersRange = [2, 2];
-  this.reactions = {'🇦': 0, '🇧': 1, '🇨': 2, '1⃣': 2, '2⃣': 1, '3⃣': 0};
-  this.currentState = new BoardGameState(3, 3);
+function TicTacToeGame (message) {
+  Game.call(this, {
+    channelID: message.channel.id,
+    cmd: 'tictactoe',
+    numPlayersRange: [2, 2],
+    reactions: { '🇦': 0, '🇧': 1, '🇨': 2, '1⃣': 2, '2⃣': 1, '3⃣': 0 },
+    currentState: new BoardGameState(3, 3)
+  });
 }
 TicTacToeGame.prototype = Object.create(Game.prototype);
 TicTacToeGame.prototype.constructor = TicTacToeGame;
@@ -67,7 +70,7 @@ TicTacToeGame.prototype.init = async function (message, args) {
   }
 
   if (message.mentions.users.size < 1)
-    return this.channel.send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.').catch(global.logger.error);
+    return this.getChannel().send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.').catch(global.logger.error);
 	
   let challengedMember = message.mentions.members.first();
   if (challengedMember.user.bot || challengedMember.id === message.author.id) {
@@ -87,7 +90,7 @@ TicTacToeGame.prototype.start = async function () {
   if (!this.multiplayer) await this.setDifficulty();
   await this.setP1GoesFirst();
 
-  this.boardMessage = await this.channel.send({embed: this.boardEmbed()});
+  this.boardMessage = await this.getChannel().send({embed: this.boardEmbed()});
 
   if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.humanPlayer.symbol)) this.aiMove();
   await this.resetReactions();
@@ -112,7 +115,7 @@ TicTacToeGame.prototype.setP1GoesFirst = async function (p1GoesFirst) {
   if (!collected.has('1⃣')) this.switchPlayer();
 	
   this.currentState.currentPlayerSymbol = this.currentPlayer.symbol;
-  this.channel.send(`${this.currentPlayer.user}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
+  this.getChannel().send(`${this.currentPlayer.user}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
 };
 
 TicTacToeGame.prototype.resetReactions = async function (msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
@@ -143,7 +146,7 @@ TicTacToeGame.prototype.resetCollector = function () {
     let col = this.reactions[['🇦', '🇧', '🇨'].filter(col => reactionFilter(r, col))[0]];
 
     let ind = row * 3 + col;
-    if (this.currentState.board.contents[ind] !== ' ') return this.channel.send('That is not a valid move!').catch(global.logger.error);
+    if (this.currentState.board.contents[ind] !== ' ') return this.getChannel().send('That is not a valid move!').catch(global.logger.error);
     let next = new BoardGameState(this.currentState);
     next.board.contents[ind] = this.currentState.currentPlayerSymbol;
     next.currentPlayerSymbol = switchSymbol(next.currentPlayerSymbol);
@@ -185,7 +188,7 @@ TicTacToeGame.prototype.advanceTo = function (state) {
   this.switchPlayer();
   if (/(?:X|O)-won|draw/i.test(this.currentState.result)) {
     this.status = 'ended';
-    this.channel.send(`${this.currentPlayer} won! GG`).catch(global.logger.error);
+    this.getChannel().send(`${this.currentPlayer} won! GG`).catch(global.logger.error);
     this.collector.stop('game over');
     this.boardMessage.clearReactions();
     this.end();

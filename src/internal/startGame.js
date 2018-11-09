@@ -24,9 +24,8 @@ module.exports = async function (message, args, gameClass) {
     }
     if (!argsPassed) playerGame.channel.send(`You are already in a game! Type ${process.env.DEFAULT_PREFIX || '.'}${playerGame.type} view to resend the message.`).catch(global.logger.error);
   } else {
-    let gameID = Math.random().toString(36).substr(2, 9);
-    let newGame = new gameClass(gameID, message.channel);
+    let newGame = new gameClass(message, args);
     newGame.init(message, args);
-    server.insertOne(newGame);
+    newGame.update();
   }
 };

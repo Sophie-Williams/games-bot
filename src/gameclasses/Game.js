@@ -9,28 +9,32 @@
 module.exports = Game;
 
 // All of the actions are called with the game as the object. Parameters: (message, index, args)
-function Game(id, channel, command) {
-  this._id = id;
-  this.channel = channel;
-  this.command = command;
-  this.players = {};
-  this.status = 'beginning';
+const newGameData = {
+  _id: Math.random().toString(36).substr(2, 9),
+  players: {},
+  status: 'beginning'
+};
+
+function Game(data) {
+  Object.assign(this, newGameData, data);
 }
 
 Game.prototype.init = function (message, args) {
   this.status = 'running';
   const commands = require('../internal/getCommands.js');
-  let opts = Object.getOwnPropertyNames(commands[this.command].options);
+  let opts = Object.getOwnPropertyNames(commands[this.cmd].options);
   for (let i = 0; i < args.length; i++)
     if (opts.includes(args[i]))
-      commands[this.command].options[args[i]].action.call(this, message, i, args);
+      commands[this.cmd].options[args[i]].action.call(this, message, i, args);
 };
 
-/*
- * Sends a prompt to the game's channel, with the given reactions as options.
- */
+Game.prototype.getChannel = function() {
+  return global.bot.channels.get(this.channelID);
+};
+
+// Sends a prompt to the game's channel, with the given reactions as options.
 Game.prototype.prompt = async function (str, reactions, id) {
-  let msg = await this.channel.send(str).catch(global.logger.error);
+  let msg = await this.getChannel().send(str).catch(global.logger.error);
   for (let r of reactions) await msg.react(r);
 
   const collected = await msg.awaitReactions((r, user) => reactions.includes(r.emoji.name) && user.id === id, {maxUsers: 1, time: 60 * 1000});
@@ -42,8 +46,8 @@ Game.prototype.prompt = async function (str, reactions, id) {
 };
 
 Game.prototype.sendCollectorEndedMessage = function (reason) {
-  this.channel.send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type "${process.env.DEFAULT_PREFIX}${this.type} cancel" to cancel this game \
-	 and then type ${process.env.DEFAULT_PREFIX}${this.type} to start a new one.`).catch(global.logger.error);
+  this.getChannel().send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type "${process.env.DEFAULT_PREFIX || '.'}${this.cmd} cancel" to cancel this game \
+	 and then type ${process.env.DEFAULT_PREFIX || '.'}${this.type} to start a new one.`).catch(global.logger.error);
 };
 
 /*
@@ -51,37 +55,51 @@ Game.prototype.sendCollectorEndedMessage = function (reason) {
  */
 Game.prototype.end = function () {
   this.status = 'ended';
-  this.channel.send(`${this.playerIDs.map(playerID => global.bot.users.get(playerID)).join(', ')}, your ${this.type} games have ended.`).catch(global.logger.error);
-  global.db.collection(this.channel.guild.id).deleteOne({ _id: this.id });
+  this.getChannel().send(`${this.playerIDs.map(playerID => global.bot.users.get(playerID)).join(', ')}, your ${this.type} games have ended.`).catch(global.logger.error);
+  global.db.collection(this.getChannel().guild.id).deleteOne({ _id: this.id });
 };
 
 Game.prototype.addPlayer = function (userID, otherProperties) {
-  this.players[userID] = {
-    id: userID,
-    game: this,
-    user: global.bot.users.get(userID),
-    playing: true,
-    leaveGame: function () {
-      this.game.channel.send(`${this.user} has left the game!`);
-		
-      // Deletes this game from the player's list of games. Remember, this still references the game
-      let gamesList = global.servers[this.game.channel.guild.id].players[this.id];
-      gamesList.splice(gamesList.indexOf(this.id), 1);
-
-      this.playing = false;
-      // This later gets destroyed by the interval initiated in bot.js
-    }
-  };
-  Object.assign(this.players[userID], otherProperties);
+  this.players[userID] = new Player(Object.assign({
+    _id: userID,
+    gameID: this._id
+  }, otherProperties));
 
   // Adds this game's ID to the player's list of games
-  global.servers[this.channel.guild.id].players[userID][this.command] = this.id;
+  global.db.collection(this.getChannel().guild.id).updateOne({_id: userID},
+    { $push: {games: this._id} }, err => {
+      if (err) throw err;
+    });
   return this.players[userID];
 };
 
 Game.prototype.update = function() {
-  global.db.connection(this.channel.guild.id).update({_id: this._id}, this);
+  global.db.collection(this.getChannel().guild.id).updateOne({_id: this._id}, {$set: this}, err => {
+    if (err) throw err;
+  });
+};
+
+
+function Player(data) {
+  Object.assign(this, data);
 }
+
+Player.prototype.getUser = function() {
+  return global.bot.users.get(this._id);
+};
+
+Player.prototype.leaveGame = function() {
+  this.game.channel.send(`${this.user} has left the game!`);
+
+  // Deletes this game from the player's list of games
+  global.db.collection(this.game.channel.guild._id).update(
+    { _id: this.id },
+    { $pull: { games: this._id } });
+};
+
+Player.prototype.update = function() {
+  global.db.collection(this.game.channel.guild.id).update({_id: this._id}, this);
+};
 
 // Static functions
 // const defaultOptions = {
@@ -103,7 +121,7 @@ Game.prototype.update = function() {
 // 		aliases: ['v'],
 // 		usage: 'Resends the game board',
 // 		action: async function () {
-// 			const msg = await this.channel.send({embed: this.boardEmbed()}).catch(global.logger.error);
+// 			const msg = await this.getChannel().send({embed: this.boardEmbed()}).catch(global.logger.error);
 // 			this.boardMessage = msg;
 // 		}
 // 	}
