@@ -14,9 +14,9 @@ function AIAction (pos) {
  */
 AIAction.prototype.applyTo = function (state, botSymbol) {
   let next = new BoardGameState(state);
-  let temp = next.board.contents.slice();
+  let temp = next.contents.slice();
   temp[this.movePosition] = state.currentPlayerSymbol;
-  next.board.contents = temp;
+  next.contents = temp;
 
   if (next.currentPlayerSymbol === botSymbol)
     next.aiMovesCount++;
@@ -44,14 +44,14 @@ AIAction.DESCENDING = (firstAction, secondAction) => {
  * and if it is the AI we want to maximize the value.
  */
 AIAction.minimaxValue = function (state, humanPlayerSymbol) {
-  const term = state.board.isTerminal();
+  const term = state.isTerminal();
   if (term) {
     state.result = term ? term : 'running';
     return state.score(humanPlayerSymbol);
   }
 
   let stateScore = (state.currentPlayerSymbol === humanPlayerSymbol) ? -1000 : 1000;
-  let availablePositions = state.board.emptyCells();
+  let availablePositions = state.emptyCells();
   let availableNextStates = availablePositions.map(pos => (new AIAction(pos)).applyTo(state, (humanPlayerSymbol === 'X') ? 'O' : 'X'));
 
   availableNextStates.forEach(nextState => {

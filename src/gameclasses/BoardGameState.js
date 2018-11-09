@@ -7,11 +7,12 @@ function BoardGameState(width, height) {
     this.currentPlayerSymbol = 'X';
     this.width = width;
     this.height = height;
-    this._contents = Array(width * height).fill(' ');
+    this.contents = Array(width * height).fill(' ');
     this.result = 'running';
     this.aiMovesCount = 0;
   } else {
     Object.assign(this, JSON.parse(JSON.stringify(width)));
+    this.contents = this.contents.slice();
   }
 }
 
@@ -23,14 +24,9 @@ BoardGameState.prototype.score = function (humanPlayerSymbol) {
   return 0;
 };
 
-Object.defineProperty(BoardGameState.prototype, 'contents', {
-  get: function () {
-    return this._contents.slice();
-  }
-});
-
 BoardGameState.prototype.emptyCells = function () {
-  return this._contents.map((val, ind) => (val === ' ') ? ind : undefined).filter(val => typeof val !== 'undefined');
+  // We map each empty cell to its index, and then remove all of the undefineds
+  return this.contents.map((val, ind) => (val === ' ') ? ind : undefined).filter(num => typeof num !== 'undefined');
 };
 
 BoardGameState.prototype.isTerminal = function () {

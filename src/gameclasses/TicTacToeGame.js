@@ -77,7 +77,10 @@ TicTacToeGame.prototype.init = async function (message, args) {
     this.addPlayer(global.bot.user.id, {symbol: 'O'});
     this.multiplayer = false;
   } else {
-    await this.prompt(`${challengedMember}, you have been challenged to play Tic Tac Toe! Tap 👍 to accept.`, ['👍'], challengedMember.id);
+    await this.prompt(`${challengedMember}, you have been challenged to play Tic Tac Toe! Tap 👍 to accept.`, {
+      reactions : ['👍'],
+      matchID: challengedMember.id
+    });
     if (this.status === 'ended') return;
     this.addPlayer(challengedMember.id, {symbol: 'O'});
     this.multiplayer = true;
@@ -101,7 +104,10 @@ TicTacToeGame.prototype.start = async function () {
 TicTacToeGame.prototype.setDifficulty = async function (difficulty) {
   let collected;
   if (typeof difficulty === 'undefined')
-    collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', ['🇪', '🇲', '🇭'], this.humanPlayer.id);
+    collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
+      reactions: ['🇪', '🇲', '🇭'],
+      matchID: this.humanPlayer._id
+    });
 
   this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[collected.first().emoji.name];
 };
@@ -109,13 +115,16 @@ TicTacToeGame.prototype.setDifficulty = async function (difficulty) {
 TicTacToeGame.prototype.setP1GoesFirst = async function (p1GoesFirst) {
   let collected;
   if (typeof p1GoesFirst === 'undefined')
-    collected = await this.prompt('Do you want to go first or second?', ['1⃣', '2⃣'], this.humanPlayer.id);
+    collected = await this.prompt('Do you want to go first or second?', {
+      reactions: ['1⃣', '2⃣'],
+      matchID: this.humanPlayer._id
+    });
 
   this.currentPlayer = this.humanPlayer;
   if (!collected.has('1⃣')) this.switchPlayer();
 	
   this.currentState.currentPlayerSymbol = this.currentPlayer.symbol;
-  this.getChannel().send(`${this.currentPlayer.user}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
+  this.getChannel().send(`${this.currentPlayer.getUser()}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
 };
 
 TicTacToeGame.prototype.resetReactions = async function (msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
@@ -130,11 +139,11 @@ TicTacToeGame.prototype.areReactionsReset = function (msg=this.boardMessage, rea
 };
 
 TicTacToeGame.prototype.resetCollector = function () {
-  let reactionFilter = (r, emoji) => r.message.reactions.get(emoji).users.has(this.currentPlayer.id);
+  let reactionFilter = (r, emoji) => r.message.reactions.get(emoji).users.has(this.currentPlayer._id);
 
   this.collector = this.boardMessage.createReactionCollector(r => {
     if (this.status !== 'running') return;
-    if (this.currentPlayer.id === global.bot.user.id) return;
+    if (this.currentPlayer._id === global.bot.user.id) return;
     if (!this.areReactionsReset(r.message)) return;
     const rowSelected = ['1⃣', '2⃣', '3⃣'].some(row => reactionFilter(r, row));
     const colSelected = ['🇦', '🇧', '🇨'].some(col => reactionFilter(r, col));
@@ -146,9 +155,10 @@ TicTacToeGame.prototype.resetCollector = function () {
     let col = this.reactions[['🇦', '🇧', '🇨'].filter(col => reactionFilter(r, col))[0]];
 
     let ind = row * 3 + col;
-    if (this.currentState.board.contents[ind] !== ' ') return this.getChannel().send('That is not a valid move!').catch(global.logger.error);
+    if (this.currentState.contents[ind] !== ' ')
+      return this.getChannel().send('That is not a valid move!').catch(global.logger.error);
     let next = new BoardGameState(this.currentState);
-    next.board.contents[ind] = this.currentState.currentPlayerSymbol;
+    next.contents[ind] = this.currentState.currentPlayerSymbol;
     next.currentPlayerSymbol = switchSymbol(next.currentPlayerSymbol);
     this.advanceTo(next);
 
@@ -188,7 +198,7 @@ TicTacToeGame.prototype.advanceTo = function (state) {
   this.switchPlayer();
   if (/(?:X|O)-won|draw/i.test(this.currentState.result)) {
     this.status = 'ended';
-    this.getChannel().send(`${this.currentPlayer} won! GG`).catch(global.logger.error);
+    this.getChannel().send(`${this.currentPlayer.getUser()} won! GG`).catch(global.logger.error);
     this.collector.stop('game over');
     this.boardMessage.clearReactions();
     this.end();
@@ -197,7 +207,7 @@ TicTacToeGame.prototype.advanceTo = function (state) {
 
 TicTacToeGame.prototype.aiMove = function () {
   if (this.status !== 'running') return;
-  const available = this.currentState.board.emptyCells();
+  const available = this.currentState.emptyCells();
   let action;
   const turn = this.currentState.currentPlayerSymbol === 'X';
 

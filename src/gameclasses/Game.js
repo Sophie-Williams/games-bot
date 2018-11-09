@@ -33,11 +33,18 @@ Game.prototype.getChannel = function() {
 };
 
 // Sends a prompt to the game's channel, with the given reactions as options.
-Game.prototype.prompt = async function (str, reactions, id) {
+Game.prototype.prompt = async function (str, data) {
   let msg = await this.getChannel().send(str).catch(global.logger.error);
-  for (let r of reactions) await msg.react(r);
+  if (data.reactions) for (let r of data.reactions) await msg.react(r);
 
-  const collected = await msg.awaitReactions((r, user) => reactions.includes(r.emoji.name) && user.id === id, {maxUsers: 1, time: 60 * 1000});
+  const filter = (r, user) => {
+    let match = true;
+    if (data.matchID) match = match && (user.id === data.matchID);
+    if (data.reactions) match = match && data.reactions.includes(r.emoji.name);
+    return match;
+  };
+
+  const collected = await msg.awaitReactions(filter, {maxUsers: 1, time: 60 * 1000});
   if (collected.size < 1) {
     this.status = 'ended';
     return this.sendCollectorEndedMessage('timed out').catch(global.logger.error);
@@ -55,7 +62,7 @@ Game.prototype.sendCollectorEndedMessage = function (reason) {
  */
 Game.prototype.end = function () {
   this.status = 'ended';
-  this.getChannel().send(`${this.playerIDs.map(playerID => global.bot.users.get(playerID)).join(', ')}, your ${this.type} games have ended.`).catch(global.logger.error);
+  this.getChannel().send(`${Object.values(this.players).map(player => global.bot.users.get(player._id)).join(', ')}, your ${this.cmd} games have ended.`).catch(global.logger.error);
   global.db.collection(this.getChannel().guild.id).deleteOne({ _id: this.id });
 };
 
@@ -70,6 +77,7 @@ Game.prototype.addPlayer = function (userID, otherProperties) {
     { $push: {games: this._id} }, err => {
       if (err) throw err;
     });
+
   return this.players[userID];
 };
 
