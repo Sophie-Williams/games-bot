@@ -11,7 +11,8 @@ module.exports = Game;
 // All of the actions are called with the game as the object. Parameters: (message, index, args)
 const newGameData = {
   _id: Math.random().toString(36).substr(2, 9),
-  players: {},
+  players: [],
+  currPlayer: 0,
   status: 'beginning'
 };
 
@@ -30,6 +31,10 @@ Game.prototype.init = function (message, args) {
 
 Game.prototype.getChannel = function() {
   return global.bot.channels.get(this.channelID);
+};
+
+Game.prototype.send = function(msg) {
+  this.getChannel().send(msg).catch(global.logger.error);
 };
 
 // Sends a prompt to the game's channel, with the given reactions as options.
@@ -53,8 +58,9 @@ Game.prototype.prompt = async function (str, data) {
 };
 
 Game.prototype.sendCollectorEndedMessage = function (reason) {
-  this.getChannel().send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type "${process.env.DEFAULT_PREFIX || '.'}${this.cmd} cancel" to cancel this game \
-	 and then type ${process.env.DEFAULT_PREFIX || '.'}${this.type} to start a new one.`).catch(global.logger.error);
+  this.send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type \
+  "${process.env.DEFAULT_PREFIX || '.'}${this.cmd} cancel" to cancel this game \
+	 and then type ${process.env.DEFAULT_PREFIX || '.'}${this.cmd} to start a new one.`);
 };
 
 /*
@@ -62,12 +68,13 @@ Game.prototype.sendCollectorEndedMessage = function (reason) {
  */
 Game.prototype.end = function () {
   this.status = 'ended';
-  this.getChannel().send(`${Object.values(this.players).map(player => global.bot.users.get(player._id)).join(', ')}, your ${this.cmd} games have ended.`).catch(global.logger.error);
+  this.send(`${this.players.map(p => global.bot.users.get(p._id)).join(', ')}, your ${this.cmd} games have ended.`);
   global.db.collection(this.getChannel().guild.id).deleteOne({ _id: this.id });
 };
 
 Game.prototype.addPlayer = function (userID, otherProperties) {
-  this.players[userID] = new Player(Object.assign({
+  let ind = this.players.length;
+  this.players[ind] = new Player(Object.assign({
     _id: userID,
     gameID: this._id
   }, otherProperties));
@@ -78,13 +85,17 @@ Game.prototype.addPlayer = function (userID, otherProperties) {
       if (err) throw err;
     });
 
-  return this.players[userID];
+  return this.players[ind];
 };
 
 Game.prototype.update = function() {
   global.db.collection(this.getChannel().guild.id).updateOne({_id: this._id}, {$set: this}, err => {
     if (err) throw err;
   });
+};
+
+Game.prototype.nextPlayer = function() {
+  this.currPlayer = (this.currPlayer + 1) % this.players.length;
 };
 
 

@@ -17,7 +17,6 @@ CoupGame.prototype = Object.create(Game.prototype);
 CoupGame.constructor = CoupGame;
 
 CoupGame.prototype.start = function (settings) {
-  this.players = {};
   this.deck = createCourtDeck();
   for (let i = 0; i < settings.players.length; i++) {
     this.addPlayer(settings.players[i]);

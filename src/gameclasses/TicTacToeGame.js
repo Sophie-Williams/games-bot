@@ -11,8 +11,7 @@ const options = {
     desc: 'Starts a singleplayer game.',
     action: function () {
       this.multiplayer = false;
-    },
-    flag: true
+    }
   },
   difficulty: {
     short: 'd',
@@ -45,6 +44,8 @@ module.exports = {
   gameClass: TicTacToeGame
 };
 
+const HUMAN = 0;
+
 function TicTacToeGame (message) {
   Game.call(this, {
     channelID: message.channel.id,
@@ -62,7 +63,7 @@ TicTacToeGame.prototype.constructor = TicTacToeGame;
  */
 TicTacToeGame.prototype.init = async function (message, args) {
   Object.getPrototypeOf(TicTacToeGame.prototype).init.call(this, message, args);
-  this.humanPlayer = this.addPlayer(message.author.id, {symbol: 'X'});
+  this.addPlayer(message.author.id, {symbol: 'X'});
 	
   if (this.multiplayer !== undefined && !this.multiplayer) {
     this.addPlayer(global.bot.user.id, {symbol: 'O'});
@@ -70,7 +71,7 @@ TicTacToeGame.prototype.init = async function (message, args) {
   }
 
   if (message.mentions.users.size < 1)
-    return this.getChannel().send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.').catch(global.logger.error);
+    return this.send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.');
 	
   let challengedMember = message.mentions.members.first();
   if (challengedMember.user.bot || challengedMember.id === message.author.id) {
@@ -95,7 +96,7 @@ TicTacToeGame.prototype.start = async function () {
 
   this.boardMessage = await this.getChannel().send({embed: this.boardEmbed()});
 
-  if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.humanPlayer.symbol)) this.aiMove();
+  if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.players[HUMAN].symbol)) this.aiMove();
   await this.resetReactions();
 
   this.resetCollector();
@@ -106,7 +107,7 @@ TicTacToeGame.prototype.setDifficulty = async function (difficulty) {
   if (typeof difficulty === 'undefined')
     collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
       reactions: ['🇪', '🇲', '🇭'],
-      matchID: this.humanPlayer._id
+      matchID: this.players[HUMAN]._id
     });
 
   this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[collected.first().emoji.name];
@@ -117,14 +118,13 @@ TicTacToeGame.prototype.setP1GoesFirst = async function (p1GoesFirst) {
   if (typeof p1GoesFirst === 'undefined')
     collected = await this.prompt('Do you want to go first or second?', {
       reactions: ['1⃣', '2⃣'],
-      matchID: this.humanPlayer._id
+      matchID: this.players[HUMAN]._id
     });
 
-  this.currentPlayer = this.humanPlayer;
-  if (!collected.has('1⃣')) this.switchPlayer();
+  if (!collected.has('1⃣')) this.nextPlayer();
 	
   this.currentState.currentPlayerSymbol = this.currentPlayer.symbol;
-  this.getChannel().send(`${this.currentPlayer.getUser()}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
+  this.getChannel().send(`${this.players[this.currPlayer].getUser()}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
 };
 
 TicTacToeGame.prototype.resetReactions = async function (msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
@@ -133,17 +133,17 @@ TicTacToeGame.prototype.resetReactions = async function (msg=this.boardMessage, 
     await msg.react(emoji);
 };
 
-TicTacToeGame.prototype.areReactionsReset = function (msg=this.boardMessage, reactions = Object.keys(this.reactions)) {
+TicTacToeGame.prototype.areReactionsReset = function (msg=this.boardMessage, reactions=Object.keys(this.reactions)) {
   const reactedEmojis = msg.reactions.map(re => re.emoji.name);
   return (reactions.every(emoji => reactedEmojis.includes(emoji)));
 };
 
 TicTacToeGame.prototype.resetCollector = function () {
-  let reactionFilter = (r, emoji) => r.message.reactions.get(emoji).users.has(this.currentPlayer._id);
+  let reactionFilter = (r, emoji) => r.message.reactions.get(emoji).users.has(this.players[this.currPlayer]._id);
 
   this.collector = this.boardMessage.createReactionCollector(r => {
     if (this.status !== 'running') return;
-    if (this.currentPlayer._id === global.bot.user.id) return;
+    if (this.players[this.currPlayer]._id === global.bot.user.id) return;
     if (!this.areReactionsReset(r.message)) return;
     const rowSelected = ['1⃣', '2⃣', '3⃣'].some(row => reactionFilter(r, row));
     const colSelected = ['🇦', '🇧', '🇨'].some(col => reactionFilter(r, col));
@@ -162,7 +162,7 @@ TicTacToeGame.prototype.resetCollector = function () {
     next.currentPlayerSymbol = switchSymbol(next.currentPlayerSymbol);
     this.advanceTo(next);
 
-    if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.humanPlayer.symbol))
+    if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.players[HUMAN].symbol))
       this.aiMove();
 
     this.resetReactions();
@@ -174,17 +174,11 @@ TicTacToeGame.prototype.resetCollector = function () {
   });
 };
 
-TicTacToeGame.prototype.switchPlayer = function () {
-  let playerIDs = Object.keys(this.players);
-  playerIDs.splice(playerIDs.indexOf(this.currentPlayer.id), 1);
-  this.currentPlayer = Object.assign({}, this.players[playerIDs[0]]);
-};
-
 TicTacToeGame.prototype.boardEmbed = function () {
   const embed = new RichEmbed()
     .setTimestamp()
     .setTitle('Tic Tac Toe')
-    .addField('Players', `${Object.values(this.players).map(p => `${p.user} (${p.symbol})`).join(' vs ')}`)
+    .addField('Players', `${this.players.map(p => `${p.user} (${p.symbol})`).join(' vs ')}`)
     .addField('Grid', this.currentState.grid())
     .setFooter('Type ".ttt help" to get help about this function.');
   return embed;
@@ -195,10 +189,10 @@ TicTacToeGame.prototype.advanceTo = function (state) {
   this.boardMessage.edit({embed: this.boardEmbed()});
   const term = this.currentState.isTerminal();
   this.currentState.result = term ? term : 'running';
-  this.switchPlayer();
+  this.nextPlayer();
   if (/(?:X|O)-won|draw/i.test(this.currentState.result)) {
     this.status = 'ended';
-    this.getChannel().send(`${this.currentPlayer.getUser()} won! GG`).catch(global.logger.error);
+    this.getChannel().send(`${this.players[this.currPlayer].getUser()} won! GG`).catch(global.logger.error);
     this.collector.stop('game over');
     this.boardMessage.clearReactions();
     this.end();
@@ -217,12 +211,12 @@ TicTacToeGame.prototype.aiMove = function () {
   } else {
     let availableActions = available.map(pos => {
       let availableAction = new AIAction(pos);
-      let nextState = availableAction.applyTo(this.currentState, switchSymbol(this.humanPlayer.symbol));
-      availableAction.minimaxVal = AIAction.minimaxValue(nextState, this.humanPlayer.symbol);
+      let nextState = availableAction.applyTo(this.currentState, switchSymbol(this.players[HUMAN].symbol));
+      availableAction.minimaxVal = AIAction.minimaxValue(nextState, this.players[HUMAN].symbol);
       return availableAction;
     });
 
-    availableActions.sort((turn === this.humanPlayer.symbol) ? AIAction.DESCENDING : AIAction.ASCENDING);
+    availableActions.sort((turn === this.players[HUMAN].symbol) ? AIAction.DESCENDING : AIAction.ASCENDING);
 
     action = (this.difficulty === 2 ?
       ((Math.random() * 100 <= 40) ?
@@ -231,14 +225,14 @@ TicTacToeGame.prototype.aiMove = function () {
       availableActions[0]);
   }
 
-  let next = action.applyTo(this.currentState, switchSymbol(this.humanPlayer.symbol));
+  let next = action.applyTo(this.currentState, switchSymbol(this.players[HUMAN].symbol));
   this.advanceTo(next);
 };
 
 TicTacToeGame.prototype.score = function (state) {
-  if (state.result === `${this.humanPlayer.symbol}-won`)
+  if (state.result === `${this.players[HUMAN].symbol}-won`)
     return 10 - state.aiMovesCount;
-  if (state.result === `${switchSymbol(this.humanPlayer.symbol)}-won`)
+  if (state.result === `${switchSymbol(this.players[HUMAN].symbol)}-won`)
     return -10 + state.aiMovesCount;
   return 0;
 };

@@ -57,14 +57,14 @@ function generateUsage(cmdData) {
     let optData = Object.assign({}, cmdData.options[opt]);
     if (optData.short) Object.defineProperty(cmdData.options, optData.short, { get () { return optData; } });
     
-    // No brackets if it is required
+    // No brackets if it is required, and it's not going to need a flag
     if (optData.required) {
       cmdData.usage += ` __${opt}__`;
       return;
     }
     
     // We add it to the flags if it does not take a param
-    if (optData.flag) {
+    if (!optData.noflag) {
       flags += `${optData.short}`;
       return;
     }

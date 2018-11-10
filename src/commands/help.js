@@ -30,7 +30,7 @@ function sendHelp(message, args) {
         for (let option of Object.keys(cmd.options)) {
           optionData = cmd.options[option];
           if (optionData.required || optionData.noflag) options.push(`__${option}__\n  - ${optionData.desc}`);
-          else options.push(`**-${optionData.short}**${option.flag ? '' : `__${option}__`}\n  - ${optionData.desc}`);
+          else options.push(`**-${optionData.short}**${option.noflag ? '' : `__${option}__`}\n  - ${optionData.desc}`);
         }
       }
       if (options.length > 0)

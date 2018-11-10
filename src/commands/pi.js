@@ -9,10 +9,11 @@ module.exports = {
     }
   },
   run: (message, args) => {
-    fs.readFile('../../res/pidigits.txt', (err, data) => {
+    fs.readFile('res/pidigits.txt', 'utf8', (err, data) => {
       if (err) throw err;
       let numdigs = parseInt(args[0]) || 5;
-      message.channel.send(data.substring(0, numdigs)).catch(global.logger.error);
+      if (numdigs > 1999) message.channel.send('Discord only lets you send text up to 2000 characters :(').catch(global.logger.error);
+      message.channel.send(data.substring(0, numdigs + 1)).catch(global.logger.error);
     });
   }
 };
