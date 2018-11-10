@@ -127,6 +127,14 @@ TicTacToeGame.prototype.setP1GoesFirst = async function (p1GoesFirst) {
   this.getChannel().send(`${this.players[this.currPlayer].getUser()}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
 };
 
+TicTacToeGame.prototype.setDifficulty = async function () {
+  let collected;
+  if (this.difficulty === undefined)
+    collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', ['🇪', '🇲', '🇭'], this.humanPlayer.id);
+
+  this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[collected.first().emoji.name];
+};
+
 TicTacToeGame.prototype.resetReactions = async function (msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
   await msg.clearReactions().catch(global.logger.error);
   for (let emoji of emojis)
@@ -227,6 +235,16 @@ TicTacToeGame.prototype.aiMove = function () {
 
   let next = action.applyTo(this.currentState, switchSymbol(this.players[HUMAN].symbol));
   this.advanceTo(next);
+};
+
+TicTacToeGame.prototype.boardEmbed = function () {
+  const embed = new RichEmbed()
+    .setTimestamp()
+    .setTitle('Tic Tac Toe')
+    .addField('Players', `${Object.values(this.players).map(p => `${p.user} (${p.symbol})`).join(' vs ')}`)
+    .addField('Grid', this.currentState.grid())
+    .setFooter('Type ".ttt help" to get help about this function.');
+  return embed;
 };
 
 TicTacToeGame.prototype.score = function (state) {

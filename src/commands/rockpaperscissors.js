@@ -18,6 +18,12 @@ const results = [
 module.exports = {
   aliases: ['rps'],
   desc: 'Plays rock paper scissors',
+  options: {
+    '@opponent': {
+      desc: 'The person to play against',
+      required: true
+    }
+  },
   run: rockPaperScissors
 };
 
