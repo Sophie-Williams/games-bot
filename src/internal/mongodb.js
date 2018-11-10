@@ -2,7 +2,7 @@
 // represented on the database
 
 const { MongoClient } = require('mongodb');
-const uri = 'mongodb://root:cai15212@ds255403.mlab.com:55403/the-pi-guy';
+const uri = process.env.MONGODB_URI;
 
 let dbclient;
 
@@ -28,6 +28,11 @@ module.exports.closeDB = () => {
   dbclient.close();
 };
 
+module.exports.addMember = addMember;
+module.exports.deleteMember = function (member) {
+  global.db.collection(member.guild.id).deleteOne({_id: member.id});
+};
+
 function addMember(member) {
   global.db.collection(member.guild.id).insertOne({
     _id: member.id,
@@ -35,3 +40,5 @@ function addMember(member) {
     score: 0
   });
 }
+
+

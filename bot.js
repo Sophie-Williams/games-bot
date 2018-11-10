@@ -23,7 +23,8 @@ global.bot = bot;
 
 // From the discord.js docs: "Emitted when the client becomes ready to start working."
 bot.on('ready', () => {
-  global.logger.info(`${bot.user.username} is connected.`);
+  bot.generateInvite().then(invite =>
+    global.logger.info(`Logged in at ${bot.user.tag}. Invite at ${invite}`));
   bot.user.setActivity('with my board games', { type: 'PLAYING' });
   mongodb.initServers();
 });
@@ -53,10 +54,8 @@ bot.on('message', message => {
   }
 });
 
-// bot.on('guildMemberAdd', () => {
-// });
-// bot.on('guildMemberRemove', () => {
-// });
+bot.on('guildMemberAdd', mongodb.addMember);
+bot.on('guildMemberRemove', mongodb.deleteMember);
 
 bot.login(process.env.BOT_TOKEN);
 

@@ -33,8 +33,8 @@ function getCommands() {
 }
 
 function generateCommand (data, gameClass) {
-  let defaults = gameClass ? {run: (message, args) => startGame(message, args, gameClass)} : {};
-  let cmdData = Object.assign(defaults, data);
+  let cmdData = Object.assign({}, data);
+  if (gameClass) cmdData.run = (message, args) => startGame(message, args, gameClass);
 	
   cmdData.usage = cmdData.aliases ? `[${[cmdData.cmd, ...cmdData.aliases].join('|')}]` : cmdData.cmd;
   if (cmdData.options)
