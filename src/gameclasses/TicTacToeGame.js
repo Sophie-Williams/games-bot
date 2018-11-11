@@ -7,14 +7,14 @@ const AIAction = require('./AIAction.js');
 
 const options = {
   singleplayer: {
-    short: 's',
+    aliases: ['s'],
     desc: 'Starts a singleplayer game.',
     action: function () {
       this.multiplayer = false;
     }
   },
   difficulty: {
-    short: 'd',
+    aliases: ['d'],
     desc: 'Sets the difficulty to __difficulty__. Assumes **-s**.',
     action: function (m, ind, args) {
       let diff = args[ind+1];
@@ -24,7 +24,7 @@ const options = {
     }
   },
   go: {
-    short: 'g',
+    aliases: ['g'],
     desc: 'Begins the game with you as the __playernum__th player.',
     action: function (m, ind, args) {
       let goFirst = args[ind+1];
@@ -130,7 +130,7 @@ TicTacToeGame.prototype.setP1GoesFirst = async function (p1GoesFirst) {
 TicTacToeGame.prototype.setDifficulty = async function () {
   let collected;
   if (this.difficulty === undefined)
-    collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', ['🇪', '🇲', '🇭'], this.humanPlayer.id);
+    collected = await this.prompt('Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', ['🇪', '🇲', '🇭'], this.players[HUMAN].id);
 
   this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[collected.first().emoji.name];
 };

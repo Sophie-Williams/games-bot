@@ -13,6 +13,8 @@ MongoClient.connect(uri, { useNewUrlParser: true }, (err, client) => {
   global.logger.info('Database connected');
 });
 
+module.exports.closeDB = () => dbclient.close();
+
 module.exports.initServers = () => {
   global.bot.guilds.forEach(guild => {    
     guild.members.forEach(member => {
@@ -21,11 +23,15 @@ module.exports.initServers = () => {
         if (!res) addMember(member);
       });
     });
-  });
-};
 
-module.exports.closeDB = () => {
-  dbclient.close();
+    global.db.collection(guild.id).findOne({ _id: 0 }, (err, res) => {
+      if (err) throw err;
+      if (!res) global.db.collection(guild.id).insertOne({
+        _id: 0,
+        prefix: process.env.DEFAULT_PREFIX || '.'
+      });
+    });
+  });
 };
 
 module.exports.addMember = addMember;

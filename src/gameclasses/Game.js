@@ -79,6 +79,7 @@ Game.prototype.addPlayer = function (userID, otherProperties) {
     gameID: this._id
   }, otherProperties));
 
+  console.log(`Adding player ${userID}`);
   // Adds this game's ID to the player's list of games
   global.db.collection(this.getChannel().guild.id).updateOne({_id: userID},
     { $push: {games: this._id} }, err => {
@@ -88,7 +89,7 @@ Game.prototype.addPlayer = function (userID, otherProperties) {
   return this.players[ind];
 };
 
-Game.prototype.update = function() {
+Game.prototype.save = function() {
   global.db.collection(this.getChannel().guild.id).updateOne({_id: this._id}, {$set: this}, err => {
     if (err) throw err;
   });
@@ -111,12 +112,12 @@ Player.prototype.leaveGame = function() {
   this.game.channel.send(`${this.user} has left the game!`);
 
   // Deletes this game from the player's list of games
-  global.db.collection(this.game.channel.guild._id).update(
+  global.db.collection(this.game.channel.guild._id).updateOne(
     { _id: this.id },
     { $pull: { games: this._id } });
 };
 
-Player.prototype.update = function() {
+Player.prototype.save = function() {
   global.db.collection(this.game.channel.guild.id).update({_id: this._id}, this);
 };
 

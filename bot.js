@@ -7,15 +7,13 @@
  */
 
 const { Client } = require('discord.js');
-const commands = require('./src/internal/getCommands.js');
 const dotenv = require('dotenv');
 dotenv.load();
-
-let prefix = process.env.DEFAULT_PREFIX || '.';
 
 // load in the logger and the database
 require('./src/internal/logger.js');
 const mongodb = require('./src/internal/mongodb.js');
+const { commands } = require('./src/commands/commands.js');
 
 global.logger.info('Initializing client');
 const bot = new Client();
@@ -23,8 +21,7 @@ global.bot = bot;
 
 // From the discord.js docs: "Emitted when the client becomes ready to start working."
 bot.on('ready', () => {
-  bot.generateInvite().then(invite =>
-    global.logger.info(`Logged in at ${bot.user.tag}. Invite at ${invite}`));
+  global.logger.info(`Logged in at ${bot.user.tag}.`);
   bot.user.setActivity('with my board games', { type: 'PLAYING' });
   mongodb.initServers();
 });
@@ -38,24 +35,33 @@ bot.on('message', message => {
   if (message.author.bot) return;
   if (message.channel.type !== 'text') return;
 
-  if (!(message.content.indexOf(prefix) === 0)) return;
+  global.db.collection(message.guild.id).findOne({ _id: 0 }, (err, res) => {
+    if (err) throw err;
 
-  args = message.content.substring(1).split(' ');
-  cmd = args.shift();
+    let prefix = res.prefix;
+    if (!(message.content.indexOf(prefix) === 0)) return;
+    args = message.content.substring(1).split(' ');
+    cmd = args.shift();
 
-  if (!commands.hasOwnProperty(cmd))
-    return message.channel.send('That is not a valid command. Please type .help to get help').catch(global.logger.error);
-  try {
-    global.logger.info(`message responded from user ${message.author.username}. Content: "${message.content}"`);
-    commands[cmd].run(message, args);
-  } catch (err) {
-    message.channel.send('Beep boop error error').catch(global.logger.error);
-    global.logger.error(err.stack);
-  }
+    console.log(prefix, cmd, args);
+
+    if (!commands.hasOwnProperty(cmd))
+      return message.channel.send('That is not a valid command. Please type .help to get help').catch(global.logger.error);
+    try {
+      global.logger.info(`message responded from user ${message.author.username}. Content: "${message.content}"`);
+      commands[cmd].run(message, args);
+    } catch (err) {
+      message.channel.send('Beep boop error error').catch(global.logger.error);
+      global.logger.error(err.stack);
+    }
+  });
 });
 
 bot.on('guildMemberAdd', mongodb.addMember);
 bot.on('guildMemberRemove', mongodb.deleteMember);
+
+bot.on('warn', global.logger.warn);
+bot.on('error', global.logger.error);
 
 bot.login(process.env.BOT_TOKEN);
 
