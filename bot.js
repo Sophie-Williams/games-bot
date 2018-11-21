@@ -13,7 +13,7 @@ dotenv.load();
 // load in the logger and the database
 require('./src/internal/logger.js');
 const mongodb = require('./src/internal/mongodb.js');
-const { commands } = require('./src/commands/commands.js');
+const commands = require('./src/internal/commands.js');
 
 global.logger.info('Initializing client');
 const bot = new Client();
@@ -42,8 +42,6 @@ bot.on('message', message => {
     if (!(message.content.indexOf(prefix) === 0)) return;
     args = message.content.substring(1).split(' ');
     cmd = args.shift();
-
-    console.log(prefix, cmd, args);
 
     if (!commands.hasOwnProperty(cmd))
       return message.channel.send('That is not a valid command. Please type .help to get help').catch(global.logger.error);

@@ -22,7 +22,7 @@ function Game(data) {
 
 Game.prototype.init = function (message, args) {
   this.status = 'running';
-  const commands = require('../internal/getCommands.js');
+  const commands = require('../internal/commands.js');
   let opts = Object.getOwnPropertyNames(commands[this.cmd].options);
   for (let i = 0; i < args.length; i++)
     if (opts.includes(args[i]))
