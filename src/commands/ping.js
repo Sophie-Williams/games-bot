@@ -1,4 +1,5 @@
 module.exports = {
   desc: 'Returns the ping time to the bot.',
-  run: message => message.channel.send(`Pong! ${global.bot.ping} ms`).catch(global.logger.error)
+  usage: 'ping',
+  run: (client, message) => message.channel.send(`Pong! ${client.ping} ms`).catch(client.error)
 };

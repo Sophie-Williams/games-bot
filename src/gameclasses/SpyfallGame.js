@@ -1,9 +1,11 @@
-'use strict';
-
 const RichEmbed = require('discord.js').RichEmbed;
 const Game = require('./Game.js');
 
-module.exports = SpyfallGame;
+module.exports = {
+  desc: 'Play the hidden identity game Spyfall!',
+  usage: 'spyfall [__version__]',
+  dev: true
+};
 
 const locations = [
   ['Airplane', 'Bank', 'Beach', 'Cathedral', 'Circus Tent', 'Corporate Party', 'Crusader Army', 'Casino', 'Day Spa', 'Embassy', 'Hospital', 'Hotel', 'Military Base', 'Movie Studio', 'Ocean Liner', 'Passenger Train', 'Pirate Ship', 'Polar Station', 'Police Station', 'Restaurant', 'School', 'Service Station', 'Space Station', 'Submarine', 'Supermarket', 'Theater', 'University', 'World War II Squad'],
@@ -40,7 +42,7 @@ function SpyfallGame(id, channel, version = '1', time = 8 * 60 * 1000) {
 SpyfallGame.prototype = Object.create(Game.prototype);
 SpyfallGame.constructor = SpyfallGame;
 
-SpyfallGame.prototype.start = async function (pIDs) {
+SpyfallGame.prototype.start = async function (client, pIDs) {
   this.status = 'running';
   this.spyID = pIDs[Math.floor(Math.random() * pIDs.length)];
   for (let id of pIDs)
@@ -61,7 +63,7 @@ SpyfallGame.prototype.start = async function (pIDs) {
 
   this.startingTime = new Date().getTime();
   this.boardMessage = await this.getChannel().send(`Time remaining: ${this.gameTime}`);
-  global.bot.setInterval(() => {
+  client.setInterval(() => {
     let remaining = this.gameTime - (new Date().getTime() - this.startingTime);
     if (remaining <= 0) return this.boardMessage.edit('Time\'s up!');
     let minutes = Math.floor(remaining / 1000 / 60);

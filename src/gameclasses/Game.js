@@ -1,14 +1,5 @@
-'use strict';
-
-/*
- * This is the parent class for all games in the program.
- * Javascript does not support abstract classes, but this class should never
- * be instantiated directly.
- */
-
 module.exports = Game;
 
-// All of the actions are called with the game as the object. Parameters: (message, index, args)
 const newGameData = {
   _id: Math.random().toString(36).substr(2, 9),
   players: [],
@@ -16,30 +7,39 @@ const newGameData = {
   status: 'beginning'
 };
 
+/**
+ * This is the parent class for all games in the program.
+ * Javascript does not support abstract classes, but this class should never
+ * be instantiated directly.
+ * @param {Object} data 
+ */
 function Game(data) {
   Object.assign(this, newGameData, data);
 }
 
-Game.prototype.init = function (message, args) {
+/**
+ * This is the function called when a user sends a message beginning with this command.
+ */
+Game.prototype.run = function (client, message, args) {
   this.status = 'running';
-  const commands = require('../internal/commands.js');
-  let opts = Object.getOwnPropertyNames(commands[this.cmd].options);
   for (let i = 0; i < args.length; i++)
-    if (opts.includes(args[i]))
-      commands[this.cmd].options[args[i]].action.call(this, message, i, args);
+    if (this.options.hasOwnProperty(args[i]))
+      this.options[args[i]].action.call(this, client, message, i, args);
 };
 
-Game.prototype.getChannel = function() {
-  return global.bot.channels.get(this.channelID);
+Game.prototype.getChannel = function (client) {
+  return client.channels.get(this.channelID);
 };
 
-Game.prototype.send = function(msg) {
-  this.getChannel().send(msg).catch(global.logger.error);
-};
+// Game.prototype.send = function (client, msg) {
+//   this.getChannel().send(msg).catch(client.error);
+// };
 
-// Sends a prompt to the game's channel, with the given reactions as options.
-Game.prototype.prompt = async function (str, data) {
-  let msg = await this.getChannel().send(str).catch(global.logger.error);
+/** 
+ * Sends a prompt to the game's channel, with the given reactions as options.
+ */
+Game.prototype.prompt = async function (client, str, data) {
+  let msg = await this.getChannel().send(str).catch(client.error);
   if (data.reactions) for (let r of data.reactions) await msg.react(r);
 
   const filter = (r, user) => {
@@ -52,7 +52,7 @@ Game.prototype.prompt = async function (str, data) {
   const collected = await msg.awaitReactions(filter, {maxUsers: 1, time: 60 * 1000});
   if (collected.size < 1) {
     this.status = 'ended';
-    return this.sendCollectorEndedMessage('timed out').catch(global.logger.error);
+    return this.sendCollectorEndedMessage('timed out').catch(client.error);
   }
   return collected;
 };
@@ -66,13 +66,13 @@ Game.prototype.sendCollectorEndedMessage = function (reason) {
 /*
  * Deletes the game and removes it from its players' lists.
  */
-Game.prototype.end = function () {
+Game.prototype.end = function (client) {
   this.status = 'ended';
-  this.send(`${this.players.map(p => global.bot.users.get(p._id)).join(', ')}, your ${this.cmd} games have ended.`);
-  global.db.collection(this.getChannel().guild.id).deleteOne({ _id: this.id });
+  this.send(`${this.players.map(p => client.users.get(p._id)).join(', ')}, your ${this.cmd} games have ended.`);
+  client.mongodb.collection(this.getChannel().guild.id).deleteOne({ _id: this.id });
 };
 
-Game.prototype.addPlayer = function (userID, otherProperties) {
+Game.prototype.addPlayer = function (client, userID, otherProperties) {
   let ind = this.players.length;
   this.players[ind] = new Player(Object.assign({
     _id: userID,
@@ -81,21 +81,21 @@ Game.prototype.addPlayer = function (userID, otherProperties) {
 
   console.log(`Adding player ${userID}`);
   // Adds this game's ID to the player's list of games
-  global.db.collection(this.getChannel().guild.id).updateOne({_id: userID},
-    { $push: {games: this._id} }, err => {
+  client.mongodb.collection(this.getChannel().guild.id).updateOne({_id: userID},
+    { $push: { games: this._id } },err => {
       if (err) throw err;
     });
 
   return this.players[ind];
 };
 
-Game.prototype.save = function() {
-  global.db.collection(this.getChannel().guild.id).updateOne({_id: this._id}, {$set: this}, err => {
+Game.prototype.save = function (client) {
+  client.mongodb.collection(this.getChannel().guild.id).updateOne({_id: this._id}, {$set: this}, err => {
     if (err) throw err;
   });
 };
 
-Game.prototype.nextPlayer = function() {
+Game.prototype.nextPlayer = function () {
   this.currPlayer = (this.currPlayer + 1) % this.players.length;
 };
 
@@ -104,21 +104,21 @@ function Player(data) {
   Object.assign(this, data);
 }
 
-Player.prototype.getUser = function() {
-  return global.bot.users.get(this._id);
+Player.prototype.getUser = function (client) {
+  return client.users.get(this._id);
 };
 
-Player.prototype.leaveGame = function() {
+Player.prototype.leaveGame = function (client) {
   this.game.channel.send(`${this.user} has left the game!`);
 
   // Deletes this game from the player's list of games
-  global.db.collection(this.game.channel.guild._id).updateOne(
+  client.mongodb.collection(this.game.channel.guild._id).updateOne(
     { _id: this.id },
     { $pull: { games: this._id } });
 };
 
-Player.prototype.save = function() {
-  global.db.collection(this.game.channel.guild.id).update({_id: this._id}, this);
+Player.prototype.save = function (client) {
+  client.mongodb.collection(this.game.channel.guild.id).update({_id: this._id}, this);
 };
 
 // Static functions
@@ -141,7 +141,7 @@ Player.prototype.save = function() {
 // 		aliases: ['v'],
 // 		usage: 'Resends the game board',
 // 		action: async function () {
-// 			const msg = await this.getChannel().send({embed: this.boardEmbed()}).catch(global.logger.error);
+// 			const msg = await this.getChannel().send({embed: this.boardEmbed()}).catch(client.error);
 // 			this.boardMessage = msg;
 // 		}
 // 	}

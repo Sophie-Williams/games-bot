@@ -1,5 +1,3 @@
-'use strict';
-
 const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
 const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
@@ -7,6 +5,7 @@ const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 
 module.exports = {
   aliases: ['4isinf'],
   desc: 'Tells you what a number is *actually* equal to, according to the rules of the game. See if you can guess what it is! No hints.',
+  usage: 'fourisinfinity __number__',
   options: {
     number: {
       desc: 'The number to use to try and guess the pattern',
@@ -16,12 +15,12 @@ module.exports = {
   run: playFourIsInfinity
 };
 
-function playFourIsInfinity(message, num) {
+function playFourIsInfinity (client, message, num) {
   if (!((parseInt(num) >= 0) && (parseInt(num) <= 999)))
-    return message.channel.send('That is not a valid number. Please enter a number from 0 to 999.').catch(global.logger.error);
+    return message.channel.send('That is not a valid number. Please enter a number from 0 to 999.').catch(client.error);
     
   if (num === 4) {
-    return message.channel.send('And 4 is infinity!').catch(global.logger.error);
+    return message.channel.send('And 4 is infinity!').catch(client.error);
   } else {
     let digits = `${num}`.split('').map(d => parseInt(d));
         
@@ -42,7 +41,7 @@ function playFourIsInfinity(message, num) {
         nextNum = `${ones[digits[0]]}hundred${tens[digits[1]]}${ones[digits[2]]}`;
     }
         
-    message.channel.send(`${num} is ${nextNum.length}`).catch(global.logger.error);
-    playFourIsInfinity(message, nextNum.length);
+    message.channel.send(`${num} is ${nextNum.length}`).catch(client.error);
+    playFourIsInfinity(client, message, nextNum.length);
   }
 }

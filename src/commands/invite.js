@@ -1,6 +1,8 @@
 module.exports = {
+  aliases: ['invitelink', 'sendinvite'],
   desc: 'Sends a link to invite this bot to your server',
-  run: message => {
-    global.bot.generateInvite().then(invite => message.channel.send(invite).catch(global.logger.error));
+  usage: 'invite',
+  run: (client, message) => {
+    client.generateInvite().then(invite => message.channel.send(invite).catch(client.error));
   }
 };

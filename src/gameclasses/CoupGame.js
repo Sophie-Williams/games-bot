@@ -1,13 +1,15 @@
-'use strict';
-
-const RichEmbed = require('discord.js').RichEmbed;
+const { RichEmbed } = require('discord.js');
 const Game = require('./Game.js');
 const shuffle = require('../internal/shuffle.js');
 
 module.exports = {
   cmd: 'coup',
   desc: 'Plays coup',
-  gameClass: CoupGame
+  usage: 'coup',
+  run: (client, message, args) => {
+    this.run(client, message, args);
+  },
+  dev: true
 };
 
 function CoupGame (id, channel) {
@@ -16,14 +18,14 @@ function CoupGame (id, channel) {
 CoupGame.prototype = Object.create(Game.prototype);
 CoupGame.constructor = CoupGame;
 
-CoupGame.prototype.start = function (settings) {
+CoupGame.prototype.start = function (client) {
   this.deck = createCourtDeck();
-  for (let i = 0; i < settings.players.length; i++) {
-    this.addPlayer(settings.players[i]);
-    settings.players[i].cards = [this.game.topCard(true), this.game.topCard(true)];
-    settings.players[i].coins = 2;
+  for (let i = 0; i < this.players.length; i++) {
+    this.addPlayer(this.players[i]);
+    this.players[i].cards = [this.game.topCard(true), this.game.topCard(true)];
+    this.players[i].coins = 2;
   }
-  promptMove(this.players[0]);
+  promptMove(client, this.players[0]);
 };
 
 CoupGame.prototype.topCard = function (deleteAfter) {
@@ -39,8 +41,8 @@ function createCourtDeck () {
   return shuffle(deck);
 }
 
-function promptMove (player) {
-  let user = global.bot.users.get(player.id);
+function promptMove (client, player) {
+  let user = client.users.get(player.id);
   let options = 'Which action would you like to take?';
   for (let i = 0; i < Object.keys(CoupGame.actions).length; i++)
     options += `[${i+1}] ${Object.keys(CoupGame.actions)[i]} (${Object.values(CoupGame.actions)[i].effect})\n`;
@@ -53,7 +55,7 @@ function promptMove (player) {
   const collector = user.dmChannel.createMessageCollector(m => /^[1-7]$/.test(m.content));
   collector.on('collect', m => {
     let action = Object.values(CoupGame.actions)[parseInt(m) - 1];
-    player.game.channel.send(`${player.user} is using ${action.name}. Type 'challenge' if you would like to challenge them.`).catch(global.logger.error);
+    player.game.channel.send(`${player.user} is using ${action.name}. Type 'challenge' if you would like to challenge them.`).catch(client.error);
   });
 }
 
