@@ -4,12 +4,17 @@ const { combine, timestamp, colorize, json, simple } = format;
 const logger = createLogger({
   transports: [
     new transports.Console({
+      level: 'verbose',
+      handleExceptions: true,
+      json: false,
       format: combine(timestamp(), colorize(), json(), simple())
     })
   ]
 });
 
 module.exports = client => {
-  client.log = logger.info;
   client.error = logger.error;
+  client.info = logger.info;
+  client.verbose = logger.verbose;
+  client.debug = logger.debug;
 };

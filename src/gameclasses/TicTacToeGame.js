@@ -40,9 +40,8 @@ module.exports = {
     }
   },
   run: async (client, message, args) => {
-    if (this.status === 'beginning')
-      await this.init();
-    this.run(client, message, args);
+    this.run(client, message, args); // From the prototype chain; loops through the options and applies the args
+    if (this.status === 'beginning') this.init();
   }
 };
 
@@ -60,11 +59,11 @@ function TicTacToeGame (message) {
 TicTacToeGame.prototype = Object.create(Game.prototype);
 TicTacToeGame.prototype.constructor = TicTacToeGame;
 
-/*
+/**
  * Starts the game, called from startGame.js when the user starts a message with the game's init command
  */
-TicTacToeGame.prototype.init = async function (client, message, args) {
-  Object.getPrototypeOf(TicTacToeGame.prototype).init.call(this, message, args);
+TicTacToeGame.prototype.init = async function (client, message) {
+  client.debug('New Tic Tac Toe game created');
   this.addPlayer(message.author.id, {symbol: 'X'});
 	
   if (this.multiplayer !== undefined && !this.multiplayer) {
@@ -76,8 +75,8 @@ TicTacToeGame.prototype.init = async function (client, message, args) {
     return this.send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.');
 	
   let challengedMember = message.mentions.members.first();
-  if (challengedMember.user.client || challengedMember.id === message.author.id) {
-    this.addPlayer(client.user.id, {symbol: 'O'});
+  if (challengedMember.user.bot || challengedMember.id === message.author.id) { // If they challenge a bot or themselves
+    this.addPlayer(client.user.id, {symbol: 'O'}); // We add the bot
     this.multiplayer = false;
   } else {
     await this.prompt(client, `${challengedMember}, you have been challenged to play Tic Tac Toe! Tap 👍 to accept.`, {

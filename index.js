@@ -12,41 +12,39 @@ require('dotenv').load();
 
 // We set up the client and the logger
 const client = new Client();
-require('./src/internal/logger.js')(client);
-client.log('Initializing client');
+require('./src/internal/logger')(client);
+client.info('Client initialized');
+client.info('Logger initialized');
+
+require('./src/internal/initmongodb.js')(client);
+client.info('Database initialized');
 
 /** @type {Collection} a collection to store the commands under src/commands */
 client.commands = new Collection();
 
 // We load the files under src/commands and src/gameclasses
-['commands', 'gameclasses'].forEach(fileType => {
+['commands', 'gameclasses', 'events'].forEach(fileType => {
   readdir(`./src/${fileType}`, (err, files) => {
     if (err) throw err;
-    client.log(`Loading ${files.length} ${fileType}s`);
+    client.verbose(`Loading ${files.length} ${fileType}`);
     files.forEach(f => loadFile(fileType, f));
-  });
-});
-
-// We load the events under src/events
-readdir('./src/events/', (err, files) => {
-  if (err) throw err;
-  files.forEach(file => {
-    let evtName = file.split('.')[0];
-    let event = require(`./src/events/${file}`);
-    
-    // We make sure client is the first argument passed
-    client.on(evtName, event.bind(null, client));
-    delete require.cache[require.resolve(`./events/${file}`)];
   });
 });
 
 function loadFile(fileType, file) {
   let name = file.split('.')[0];
   let data = require(`./src/${fileType}/${file}`);
-  if (!data.run) return; // We quit if the file is not a command
 
-  client.commands.set(name, data);
-  data.aliases.forEach(alias => client.commands.set(alias, data));
+  client.debug(`Loading ./src/${fileType}/${file}`);
+  if (fileType === 'events') {
+    client.on(name, data.bind(null, client));
+    delete require.cache[require.resolve(`./src/events/${file}`)];
+  } else {
+    if (!data.run) return; // We quit if the file is not a command
+    client.commands.set(name, data);
+    if (data.aliases) data.aliases.forEach(alias => client.commands.set(alias, data));
+  }
+  client.debug(`Loaded ${name}`);
 }
 
 // We login with the token specified in .env
@@ -58,8 +56,9 @@ client.login(process.env.BOT_TOKEN);
  */
 let exitHandler = exitCode => {
   client.dbclient.close();
-  client.log('MongoDB closed');
-  if (exitCode !== undefined) client.log(exitCode);
+  client.info('MongoDB closed');
+  if (exitCode !== undefined) client.info(exitCode);
+  client.info('Shutting down');
   process.exit();
 };
 
@@ -67,6 +66,6 @@ process.on('SIGINT', exitHandler);
 process.on('SIGUSR1', exitHandler);
 process.on('SIGUSR2', exitHandler);
 process.on('uncaughtException', e => {
-  client.log(e.stack);
+  client.info(e.stack);
   exitHandler('uncaughtException');
 });

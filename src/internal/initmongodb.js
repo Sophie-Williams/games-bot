@@ -9,6 +9,7 @@ module.exports = client => {
     if (err) throw err;
     client.dbclient = dbclient;
     client.mongodb = dbclient.db('the-pi-guy');
-    client.log('Database connected');
+    client.info('Database connected');
   });
 };
+  

@@ -42,7 +42,7 @@ module.exports = {
       choices[ind] = reactions[collected.first().emoji.name];
     });
 
-    client.log(choices);
+    client.info(choices);
     let result = '';
     [0, 1].forEach(ind => result += `${players[ind]} chose ${words[choices[ind]]}\n`);
     let p1won = results[choices[0]][choices[1]];

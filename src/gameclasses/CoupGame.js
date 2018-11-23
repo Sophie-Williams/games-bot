@@ -1,6 +1,6 @@
 const { RichEmbed } = require('discord.js');
 const Game = require('./Game.js');
-const shuffle = require('../internal/shuffle.js');
+const Deck = require('./Deck.js');
 
 module.exports = {
   cmd: 'coup',
@@ -33,12 +33,12 @@ CoupGame.prototype.topCard = function (deleteAfter) {
 };
 
 function createCourtDeck () {
-  let deck = [];
+  let deck = new Deck();
   Object.values(CoupGame.cards).forEach(card => {
     for (let i = 0; i < 3; i++)
       deck.push(Object.assign({}, card));
   });
-  return shuffle(deck);
+  deck.shuffle();
 }
 
 function promptMove (client, player) {

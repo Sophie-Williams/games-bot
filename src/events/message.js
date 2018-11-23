@@ -22,7 +22,7 @@ module.exports = async (client, message) => {
       return message.channel.send('That is not a valid command. Please type .help to get help').catch(client.error);
     
     try {
-      client.log(`message responded from user ${message.author.username}. Content: "${message.content}"`);
+      client.debug(`message responded from user ${message.author.username}. Content: "${message.content}"`);
       client.commands.get(cmdName).run(client, message, args);
     } catch (err) {
       message.channel.send('Beep boop error error').catch(client.error);
