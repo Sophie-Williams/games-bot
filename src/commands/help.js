@@ -1,48 +1,50 @@
-const RichEmbed = require('discord.js').RichEmbed;
+const { RichEmbed } = require('discord.js');
 
 module.exports = {
   aliases: ['help', 'info', 'command'],
   desc: 'sends help',
-  usage: 'help [__command__]',
   options: {
     command: {
-      desc: 'The command to get help on.',
-      noflag: true
+      desc: 'The command to get help on.'
     }
   },
-  run: (client, message, args) => {
-    // TODO
-    let prefix = client.mongodb.collection(message.guild.id).findOne({ _id: 0 }).prefix;
+  run: async (client, message, args) => {
+    // We fetch the server settings from the database and get the prefix
+    let settings = await client.mongodb.collection(message.guild.id).findOne({ _id: 0 });
+    let prefix = settings.prefix;
+
+    // If any arguments are passed
     if (args.length > 0) {
-      if (client.commands.hasOwnProperty(args[0])) {
-        let cmd = client.commands[args[0]];
-        let help = new RichEmbed()
-          .setTitle(`${args[0]}`)
-          .setDescription(cmd.desc)
-          .addField('Example', prefix + cmd.usage);
-        
-        let options = [];
-        if (cmd.options) {
-          let optionData;
-          for (let option of Object.keys(cmd.options)) {
-            optionData = cmd.options[option];
-            if (optionData.required || optionData.noflag) options.push(`__${option}__\n  - ${optionData.desc}`);
-            else options.push(`**-${optionData.aliases}**${option.noflag ? '' : `__${option}__`}\n  - ${optionData.desc}`);
-          }
-        }
-        if (options.length > 0)
-          help.addField('Options', options);
-        return message.channel.send({embed: help}).catch(client.error);
-      } else {
+      // If the first argument is not a command, se tell the user and break
+      if (!client.commands.has(args[0]))
         return message.channel.send(`${args[0]} is not a valid command. Type ${prefix}help to get a list of valid commands.`).catch(client.error);
+
+      // We get the command data
+      let cmd = client.commands.get(args[0].toLowerCase());
+      let help = new RichEmbed()
+        .setTitle(cmd.aliases ? [args[0], ...cmd.aliases].join('|') : args[0]) // We join the aliases with | if it has any
+        .setDescription(cmd.desc)
+        .addField('Example', prefix + cmd.usage);
+      
+      // We get the options of the command and add their usages into an array
+      if (cmd.options) {
+        let options = [];
+        Object.getOwnPropertyNames(cmd.options).forEach(param => {
+          let data = cmd.options[param]; // If it's required, we underline it; if there's a flag, we bold it; if there's not no param, we add the param
+          options.push(`${data.required ? `__${param}__` : `${data.flag ? `**${data.flag}**` : ''} ${data.noParam ? '' : `__${param}__`}`}
+            - ${data.desc}`);
+        });
+        help.addField('Options', options); // Add the array of these commands to the embed
       }
+        
+      return message.channel.send({embed: help}).catch(client.error); // and finally send it
     }
+
+    // The user has not passed any arguments, so we show a generic help message with a list of the commands
 
     const help = new RichEmbed()
       .setTitle('Help')
       .setDescription('Hi, I\'m the Games Bot! Are you having a fun time?')
-      .addField('Info', 'Click [here](https://piguyinthesky.github.io/games-bot/) to visit GamesBot\'s site! \
-      (It\'s a work in progress)')
       .addField('Contribute', 'I\'m a Node.js app written using discord.js. If you want to help out, \
       feel free to open up a pull request on my [github repo](https://github.com/piguyinthesky/games-bot)')
       .addField('Invite', 'Click [here](https://discordapp.com/oauth2/authorize?client_id=468534527573098506&permissions=8&scope=bot) \
@@ -53,8 +55,12 @@ module.exports = {
       .setDescription(`A list of commands this bot listens to. Type ${prefix}help [__command__] for more info on a given command. \
       The values within the [brackets] are optional.`);
     
-    Object.values(client.commands).forEach(cmd => cmds.addField(prefix + cmd.usage, cmd.desc));
+    // For each command, if it is not an alias (copy), we add the prefix followed by the description
+    client.commands.forEach(cmd => {
+      if (!cmd.alias) cmds.addField(prefix + cmd.usage, cmd.desc);
+    });
 
+    // Finally, we send the messages
     message.channel.send({embed: help}).catch(client.error);
     message.channel.send({embed: cmds}).catch(client.error);
   }

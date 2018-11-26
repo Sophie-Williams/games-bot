@@ -5,7 +5,6 @@ const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 
 module.exports = {
   aliases: ['4isinf'],
   desc: 'Tells you what a number is *actually* equal to, according to the rules of the game. See if you can guess what it is! No hints.',
-  usage: 'fourisinfinity __number__',
   options: {
     number: {
       desc: 'The number to use to try and guess the pattern',

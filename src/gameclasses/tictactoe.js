@@ -8,19 +8,19 @@ const AIAction = require('./AIAction.js');
 module.exports = {
   aliases: ['ttt'],
   desc: 'Plays Tic Tac Toe! Type .help tictactoe for more info.',
-  usage: 'tictactoe [**-s**] [**-d** __difficulty] [**-t** __startingturn__]',
+  usage: 'tictactoe [**-s**] [**-d** __difficulty__] [**-t** __startingturn__]',
   options: {
     singleplayer: {
-      aliases: ['s'],
+      flag: 's',
       desc: 'Starts a singleplayer game.',
       action: function () {
         this.multiplayer = false;
       }
     },
     difficulty: {
-      aliases: ['d'],
+      flag: 'd',
       desc: 'Sets the difficulty to __difficulty__. Assumes **-s**.',
-      action: function (client, m, ind, args) {
+      action: function (client, m, args, ind) {
         let diff = args[ind+1];
         [/^e(?:asy)|1$/i, /^m(?:edium)|2$/i, /^h(?:ard)|3$/i].forEach((re, i) => {
           if (re.test(diff)) this.difficulty = i+1;
@@ -28,9 +28,9 @@ module.exports = {
       }
     },
     startingturn: {
-      aliases: ['t'],
+      flag: 't',
       desc: 'Begins the game with you as the __playernum__th player.',
-      action: function (client, m, ind, args) {
+      action: function (client, m, args, ind) {
         let goFirst = args[ind+1];
         if ((/^t(?:rue)|y(?:es)|1$/).test(goFirst))
           this.p1GoesFirst = true;

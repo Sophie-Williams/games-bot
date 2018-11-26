@@ -1,6 +1,5 @@
 module.exports = {
   desc: 'Gets the bot to send a phrase.',
-  usage: 'echo __phrase__',
   options: {
     phrase: {
       desc: 'The phrase for the bot to send',

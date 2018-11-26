@@ -24,7 +24,7 @@ Game.prototype.run = function (client, message, args) {
   this.status = 'running';
   for (let i = 0; i < args.length; i++)
     if (this.options.hasOwnProperty(args[i]))
-      this.options[args[i]].action.call(this, client, message, i, args);
+      this.options[args[i]].action.call(this, client, message, args, i);
 };
 
 Game.prototype.getChannel = function (client) {

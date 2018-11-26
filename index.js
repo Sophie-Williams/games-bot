@@ -16,7 +16,7 @@ require('./src/internal/logger')(client);
 client.info('Client initialized');
 client.info('Logger initialized');
 
-require('./src/internal/initmongodb.js')(client);
+require('./src/internal/initmongodb')(client);
 client.info('Database initialized');
 
 /** @type {Collection} a collection to store the commands under src/commands */
@@ -38,12 +38,30 @@ function loadFile(fileType, file) {
   client.debug(`Loading ./src/${fileType}/${file}`);
   if (fileType === 'events') {
     client.on(name, data.bind(null, client));
-    delete require.cache[require.resolve(`./src/events/${file}`)];
   } else {
     if (!data.run) return; // We quit if the file is not a command
+    if (data.options) { // We generate the usage for each option
+      let usage = name;
+      Object.getOwnPropertyNames(data.options).forEach(param => {
+        let opt = data.options[param];
+        if (opt.required) // If it's required, we underline it and the description
+          usage += ` __${param}__`;
+        else { // It's optional, so we surround it with brackets
+          usage += ' [';
+          usage += ((opt.flag ? `**${opt.flag}** ` : '') + (opt.noParam ? '' : `__${param}__`)).trim(); // So that it neatly fits the brackets
+          usage += ']';
+        }
+      });
+      Object.assign(data, { usage });
+    }
     client.commands.set(name, data);
-    if (data.aliases) data.aliases.forEach(alias => client.commands.set(alias, data));
+    if (data.aliases) data.aliases.forEach(alias => {
+      client.commands.set(alias, Object.assign({}, data, { alias: true }));
+    });
   }
+
+  // We delete it from the cache
+  delete require.cache[require.resolve(`./src/${fileType}/${file}`)];
   client.debug(`Loaded ${name}`);
 }
 
@@ -66,6 +84,6 @@ process.on('SIGINT', exitHandler);
 process.on('SIGUSR1', exitHandler);
 process.on('SIGUSR2', exitHandler);
 process.on('uncaughtException', e => {
-  client.info(e.stack);
+  client.error(e.stack);
   exitHandler('uncaughtException');
 });
