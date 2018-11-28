@@ -8,7 +8,7 @@ module.exports = {
   },
   run: (client, message, args) => {
     // If no args are passed, we break with an error message
-    if (!args[0]) return message.channel.send('What do you want to set my prefix to?').catch(client.error);
+    if (!args[0]) return message.channel.send('What do you want to set my prefix to?');
     
     // We update the server settings and change the server prefix to the first argument passed
     client.mongodb.collection(message.guild.id).updateOne({ _id: 0 }, { $set: { prefix: args[0] } }, err => {

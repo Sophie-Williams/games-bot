@@ -35,6 +35,6 @@ module.exports = {
     if (!Object.keys(languages).includes(lang)) // If there is no language, we randomly choose one with a bit of math
       lang = Object.keys(languages)[Math.floor(Math.random() * Object.keys(languages).length)];
     
-    message.channel.send(`${languages[lang]}! (${lang})`).catch(client.error); // And send it
+    message.channel.send(`${languages[lang]}! (${lang})`); // And send it
   }
 };

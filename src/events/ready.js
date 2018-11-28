@@ -2,9 +2,9 @@ module.exports = client => {
   client.info(`Logged in at ${client.user.tag}.`);
   client.user.setActivity('with my board games', { type: 'PLAYING' });
   client.guilds.forEach(guild => {
-    client.verbose(`Asserting guild ${guild.name} settings`);
+    client.debug(`Asserting guild ${guild.name} settings`);
     assertGuildSettings(client, guild);
-    client.verbose(`Asserting ${guild.members.size} members`);
+    client.debug(`Asserting ${guild.members.size} members`);
     guild.members.forEach(member => assertMember(client, member));
   });
 };
@@ -30,7 +30,7 @@ function assertGuildSettings(client, guild) {
 function addMember(client, member) {
   client.mongodb.collection(member.guild.id).insertOne({
     _id: member.id,
-    games: [],
+    member: true,
     score: 0
   });
 }

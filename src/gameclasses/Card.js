@@ -25,7 +25,7 @@ function Card(value, suit) {
 }
 
 Card.prototype.show = function (client, message) {
-  message.channel.send(this.description(), {file: this.imageURL}).catch(client.error);
+  message.channel.send(this.description(), {file: this.imageURL});
 };
 
 // function createDeck() {

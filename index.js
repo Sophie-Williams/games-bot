@@ -21,43 +21,47 @@ client.info('Database initialized');
 
 /** @type {Collection} a collection to store the commands under src/commands */
 client.commands = new Collection();
+/** @type {Collection} a collection to store the ongoing games in temporary memory, since their functions are hard to be stored in databases */
+client.games = new Collection();
 
 // We load the files under src/commands and src/gameclasses
-['commands', 'gameclasses', 'events'].forEach(fileType => {
+['commands', 'gameclasses', 'events'].forEach(fileType =>
   readdir(`./src/${fileType}`, (err, files) => {
-    if (err) throw err;
+    if (err) return client.error(err);
     client.verbose(`Loading ${files.length} ${fileType}`);
     files.forEach(f => loadFile(fileType, f));
-  });
-});
+  })
+);
 
+/**
+ * A function that loads commands into the client.commands collection and events.
+ * @param {string} fileType one of commands, gameclasses, or events
+ * @param {string} file 
+ */
 function loadFile(fileType, file) {
-  let name = file.split('.')[0];
   let data = require(`./src/${fileType}/${file}`);
+  let name = data.name || file.split('.')[0]; // If the command has a name, we set it to that, otherwise it's the filename without the extension
 
   client.debug(`Loading ./src/${fileType}/${file}`);
   if (fileType === 'events') {
     client.on(name, data.bind(null, client));
-  } else {
+  } else { // Commands and game classes are treated separately
     if (!data.run) return; // We quit if the file is not a command
     if (data.options) { // We generate the usage for each option
-      let usage = name;
-      Object.getOwnPropertyNames(data.options).forEach(param => {
+      let usage = data.aliases ? [name, ...data.aliases].join('|') : name; // First joining the command name with its aliases
+      Object.getOwnPropertyNames(data.options).forEach(param => { // Then we go through its options and add each one accordingly
         let opt = data.options[param];
         if (opt.required) // If it's required, we underline it and the description
           usage += ` __${param}__`;
-        else { // It's optional, so we surround it with brackets
-          usage += ' [';
-          usage += ((opt.flag ? `**${opt.flag}** ` : '') + (opt.noParam ? '' : `__${param}__`)).trim(); // So that it neatly fits the brackets
-          usage += ']';
-        }
+        else // It's optional, so we surround it with brackets
+          usage += ` [${((opt.flag ? `**${opt.flag}** ` : '') + (opt.noParam ? '' : `__${param}__`)).trim()}]`;
       });
       Object.assign(data, { usage });
     }
     client.commands.set(name, data);
-    if (data.aliases) data.aliases.forEach(alias => {
-      client.commands.set(alias, Object.assign({}, data, { alias: true }));
-    });
+    if (data.aliases) data.aliases.forEach(alias => // We set the aliases onto client.commands as well
+      client.commands.set(alias, Object.assign({}, data, { alias: true }))
+    );
   }
 
   // We delete it from the cache

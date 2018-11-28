@@ -17,7 +17,7 @@ module.exports = {
     if (args.length > 0) {
       // If the first argument is not a command, se tell the user and break
       if (!client.commands.has(args[0]))
-        return message.channel.send(`${args[0]} is not a valid command. Type ${prefix}help to get a list of valid commands.`).catch(client.error);
+        return message.channel.send(`${args[0]} is not a valid command. Type ${prefix}help to get a list of valid commands.`);
 
       // We get the command data
       let cmd = client.commands.get(args[0].toLowerCase());
@@ -37,7 +37,7 @@ module.exports = {
         help.addField('Options', options); // Add the array of these commands to the embed
       }
         
-      return message.channel.send({embed: help}).catch(client.error); // and finally send it
+      return message.channel.send({embed: help}); // and finally send it
     }
 
     // The user has not passed any arguments, so we show a generic help message with a list of the commands
@@ -57,11 +57,12 @@ module.exports = {
     
     // For each command, if it is not an alias (copy), we add the prefix followed by the description
     client.commands.forEach(cmd => {
-      if (!cmd.alias) cmds.addField(prefix + cmd.usage, cmd.desc);
+      if (cmd.alias) return;
+      cmds.addField(prefix + cmd.usage, cmd.desc);
     });
 
     // Finally, we send the messages
-    message.channel.send({embed: help}).catch(client.error);
-    message.channel.send({embed: cmds}).catch(client.error);
+    message.channel.send({embed: help});
+    message.channel.send({embed: cmds});
   }
 };

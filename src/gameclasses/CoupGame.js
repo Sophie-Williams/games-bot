@@ -20,10 +20,10 @@ CoupGame.constructor = CoupGame;
 
 CoupGame.prototype.start = function (client) {
   this.deck = createCourtDeck();
-  for (let i = 0; i < this.players.length; i++) {
-    this.addPlayer(this.players[i]);
-    this.players[i].cards = [this.game.topCard(true), this.game.topCard(true)];
-    this.players[i].coins = 2;
+  for (let i = 0; i < this.players.size; i++) {
+    this.addPlayer(this.players.get(i));
+    this.players.get(i).cards = [this.game.topCard(true), this.game.topCard(true)];
+    this.players.get(i).coins = 2;
   }
   promptMove(client, this.players[0]);
 };
@@ -45,17 +45,17 @@ function promptMove (client, player) {
   let user = client.users.get(player.id);
   let options = 'Which action would you like to take?';
   for (let i = 0; i < Object.keys(CoupGame.actions).length; i++)
-    options += `[${i+1}] ${Object.keys(CoupGame.actions)[i]} (${Object.values(CoupGame.actions)[i].effect})\n`;
+    options += `\n[${i+1}] ${Object.keys(CoupGame.actions)[i]} (${Object.values(CoupGame.actions)[i].effect})`;
 
   const embed = new RichEmbed()
     .setTitle('It\'s your turn!')
     .setDescription(options);
 
-  user.send({embed: embed});
+  user.send({ embed });
   const collector = user.dmChannel.createMessageCollector(m => /^[1-7]$/.test(m.content));
   collector.on('collect', m => {
     let action = Object.values(CoupGame.actions)[parseInt(m) - 1];
-    player.game.channel.send(`${player.user} is using ${action.name}. Type 'challenge' if you would like to challenge them.`).catch(client.error);
+    player.game.channel.send(`${player.user} is using ${action.name}. Type 'challenge' if you would like to challenge them.`);
   });
 }
 
