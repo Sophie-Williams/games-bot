@@ -1,31 +1,37 @@
-module.exports = BoardGameState;
-
+/**
+ * A class to store the contents of a particular board configuration
+ */
 class BoardGameState {
-  constructor (width, height, humanPlayerSymbol) {
-    this.currentPlayerSymbol = 'X';
-    this.humanPlayerSymbol = humanPlayerSymbol;
-    this.width = width;
-    this.height = height;
-    this.contents = Array(width * height).fill(' ');
-    this.result = 'running';
-    this.aiMovesCount = 0;
+  /**
+   * @param {string[]} contents - The array to create the board game state from, default empty
+   */
+  constructor (contents = Array(9).fill(' ')) {
+    this.contents = contents.slice();
+  }
+
+  /**
+   * Inserts a symbol into the board at a certain index.
+   * @param {number} idx 
+   * @param {string} symbol 
+   */
+  insert(idx, symbol) {
+    if (idx > this.contents.length || this.contents[idx] !== ' ') return false; // If the spot is taken or the spot does not exist
+    this.contents[idx] = symbol;
   }
 
   /** @returns a duplicate of the current state. */
   clone() {
-    let newState = Object.assign(new BoardGameState(this.width, this.height, this.humanPlayerSymbol), this);
-    newState.contents = this.contents.slice();
-    return newState;
+    return new BoardGameState(this.contents);
   }
 
   /**
-   * Gets the heuristic value of the current state, depending on if someone won
+   * @returns the heuristic value of the current state, depending on if someone won
    */
   get score() {
-    if (this.result === `${this.humanPlayerSymbol}-won`)
-      return 10 - this.aiMovesCount;
-    if (this.result === `${(this.humanPlayerSymbol === 'O') ? 'X' : 'O'}-won`)
-      return -10 + this.aiMovesCount;
+    if (this.result === 'X-won')
+      return 10;
+    if (this.result === 'O-won')
+      return -10;
     return 0;
   }
 
@@ -34,11 +40,13 @@ class BoardGameState {
    */
   get emptyCells() {
     // We map each empty cell to its index, and then remove all of the undefineds
-    return this.contents.map((val, ind) => (val === ' ') ? ind : undefined).filter(num => typeof num !== 'undefined');
+    let empties = [];
+    this.contents.forEach((val, idx) => { if (val === ' ') empties.push(idx); });
+    return empties;
   }
 
   /**
-   * Checks if the game is over for this current state.
+   * @returns if the game is over for this current state.
    */
   get isTerminal() {
     // We get all the possible ways a row of 3 can be created: horizontally, vertically, and diagonally
@@ -58,7 +66,7 @@ class BoardGameState {
   }
 
   /**
-   * Returns a formatted text representation of the board.
+   * @returns a formatted text representation of the board.
    */
   get grid() {
     let result = '';
@@ -77,3 +85,5 @@ class BoardGameState {
     return result;
   }
 }
+
+module.exports = BoardGameState;

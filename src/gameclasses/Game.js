@@ -1,27 +1,5 @@
 const { Collection } = require('discord.js');
 
-const newGameData = {
-  currPlayer: {},
-  status: 'beginning',
-  options: {
-    leave: {
-      flag: 'l',
-      usage: 'Leaves the game',
-      action: function (client, message) {
-        this.channel.send(`${message.author} has left the game!`);
-        this.players.sweep(player => player.userID === message.member.id); // We remove the player from the players collection
-      }
-    },
-    cancel: {
-      flag: 'c',
-      usage: 'If the user is in a game, cancels it',
-      action: function (client) {
-        this.end(client);
-      }
-    }
-  }
-};
-
 /**
  * This is the parent class for all games in the program.
  * Javascript does not support abstract classes, but this class should never
@@ -30,22 +8,38 @@ const newGameData = {
  */
 class Game {
   /**
-   * Creates a new game.
+   * Creates a new game with some default properties.
    * @param {string} id - a unique, randomly generated string used to reference the game
-   * @param {object} data - an object containing all of the new data added to the game
    */
-  constructor(id, data) {
+  constructor(id) {
     this.id = id;
     this.players = new Collection();
-    Object.assign(this, newGameData, data);
+    this.status = 'beginning';
+    this.options = {
+      leave: {
+        flag: 'l',
+        usage: 'Leaves the game',
+        action: function (client, message) {
+          this.channel.send(`${message.author} has left the game!`);
+          this.players.sweep(player => player.userID === message.member.id); // We remove the player from the players collection
+        }
+      },
+      cancel: {
+        flag: 'c',
+        usage: 'If the user is in a game, cancels it',
+        action: function (client) {
+          this.end(client);
+        }
+      }
+    };
   }
 
   /**
    * This is the function called when a user sends a message beginning with this command. We go through the args and see
    * if any of them match an option, and if they do we call it.
-   * @param {Client} client - the logged in client
-   * @param {Message} message - the message
-   * @param {string[]} args - the arguments passed
+   * @param {Client} client - The logged in client
+   * @param {Message} message - The message
+   * @param {string[]} args - The arguments passed
    */
   run(client, message, args) {
     this.status = 'running';
@@ -56,9 +50,10 @@ class Game {
 
   /**
    * Sends a prompt to the game's channel, with the given reactions as options.
-   * @param {Client} client 
-   * @param {string} str 
+   * @param {Client} client - The logged in client
+   * @param {string} str - The simple message to send
    * @param {object} data - Possible properties: reactions, matchID
+   * @returns {Collection<string, MessageReaction>} the collected data 
    */
   async prompt(client, channel, str, data) {
     let msg = await channel.send(str);
@@ -68,9 +63,9 @@ class Game {
     const filter = (r, user) => true && (data.matchID ? (user.id === data.matchID) : true) && (data.reactions ? data.reactions.includes(r.emoji.name) : true);
 
     const collected = await msg.awaitReactions(filter, { maxUsers: 1, time: 60 * 1000 });
-    if (collected.size < 1) {
-      this.status = 'ended';
-      return this.sendCollectorEndedMessage(client, 'timed out');
+    if (collected.size === 0) {
+      this.sendCollectorEndedMessage(client, 'timed out');
+      return this.end(client);
     }
 
     return collected;
@@ -78,8 +73,8 @@ class Game {
 
   /**
    * Sends a message to notify the user that the collector has ended. we end the game.
-   * @param {Client} reason 
-   * @param {string} reason 
+   * @param {Client} client - The logged in client
+   * @param {string} reason - The reason the collector ended
    */
   sendCollectorEndedMessage(client, reason) {
     let settings = client.mongodb.collection(this.channel.guild.id).findOne({ _id: 0 });
@@ -116,7 +111,7 @@ class Game {
     }
 
     this.status = 'ended';
-    this.send(`${this.players.map(p => client.users.get(p.id)).join(', ')}, your ${this.cmd} games have ended.`);
+    this.send(`${this.players.map(p => p.user).join(', ')}, your ${this.cmd} games have ended.`);
     client.games.delete(this.id); // Deletes this game from the player's list of games and leaves it to be garbage collected
   }
 
@@ -127,18 +122,18 @@ class Game {
    * @param {object} otherProperties - Other properties to be added on the creation of the player
    * @returns The player that was added
    */
-  addPlayer(client, user, otherProperties) {
-    this.players.set(this.players.size, Object.assign(user, otherProperties));
-    this.iter = this.players.values();
+  addPlayer(client, member, otherProperties) {
+    this.players.set(this.players.size, Object.assign({ member }, otherProperties)); // set to this.players.size is same as appending
+    this.iter = this.players.values(); // Reset the iterator
     return this.players.get(this.players.size - 1);
   }
 
   /** We move the iter for the players to the next index */
   nextPlayer() {
     this.currPlayer = this.iter.next().value;
-    if (this.currPlayer === undefined) {
-      this.iter = this.players.values();
-      this.currPlayer = this.iter.next().value;
+    if (this.currPlayer === undefined) { // If it goes past
+      this.iter = this.players.values(); // we restart it
+      this.currPlayer = this.iter.next().value; // and start to loop around again
     }
   }
 }

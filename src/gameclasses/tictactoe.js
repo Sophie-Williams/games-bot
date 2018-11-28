@@ -1,7 +1,6 @@
 const { RichEmbed } = require('discord.js');
 const Game = require('./Game.js');
 const BoardGameState = require('./BoardGameState.js');
-const AIAction = require('./AIAction.js');
 
 module.exports = {
   aliases: ['ttt'],
@@ -50,28 +49,22 @@ module.exports = {
       let id = Math.random().toString(36).substr(2, 9); // we randomly generate an id by getting a random float and mapping each digit to a char value
       client.games.set(id, new TicTacToeGame(id, message)); // and create one!
       game = client.games.get(id);
+      game.init(client, message);
     }
     game.run(client, message, args);
   }
 };
 
 /**
- * Plays Tic Tac Toe
+ * Plays Tic Tac Toe!
  */
 class TicTacToeGame extends Game {
   constructor(id, message) {
-    super(id, {
-      channel: message.channel,
-      type: 'tictactoe',
-      numPlayersRange: [2, 2],
-      reactions: { '🇦': 0, '🇧': 1, '🇨': 2, '1⃣': 2, '2⃣': 1, '3⃣': 0 },
-      currentState: new BoardGameState(3, 3)
-    });
-  }
-
-  run(client, message, args) {
-    if (this.status === 'beginning') this.init(client, message, args);
-    super.run(client, message, args);
+    super(id);
+    this.channel = message.channel;
+    this.type = 'tictactoe';
+    this.reactions = { '🇦': 0, '🇧': 1, '🇨': 2, '1⃣': 2, '2⃣': 1, '3⃣': 0 };
+    this.currentState = new BoardGameState();
   }
 
   /**
@@ -81,70 +74,65 @@ class TicTacToeGame extends Game {
    */
   async init(client, message) {
     client.debug('New Tic Tac Toe game created');
-    this.addPlayer(message.member, { symbol: 'X' });
+    this.addPlayer(message.member, { symbol: 'X' }); // The person who sends the message will always be x
     
-    if (this.multiplayer !== undefined && !this.multiplayer) {
-      this.addPlayer(this.channel.guild.members.get(client.user.id), { symbol: 'O' });
-      return this.start(client);
-    }
+    if (this.multiplayer === false) { // If the multiplayer has been *set* to false
+      this.addPlayer(this.channel.guild.members.get(client.user.id), { symbol: 'O' }); // We add the bot and start the game
+    } else {
+      if (message.mentions.members.size < 1) { // If nobody gets mentioned
+        message.channel.send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.');
+        return this.end(client);
+      }
 
-    if (message.mentions.users.size < 1) { // If nobody gets mentioned
-      message.channel.send('Please mention someone to challenge to Tic Tac Toe, or type .ttt s to play singleplayer.');
-      return this.end(client);
-    }
+      let challengedMember = message.mentions.members.first();
+      if (challengedMember.user.bot || challengedMember.id === message.author.id) { // If they challenge a bot or themselves
+        this.addPlayer(this.channel.guild.members.get(client.user.id), { symbol: 'O' }); // We add the bot
+        this.multiplayer = false;
+      } else { // They challenged another player, so we send the challenge to the channel
+        await this.prompt(client, `${challengedMember}, you have been challenged to play Tic Tac Toe! Tap 👍 to accept.`, {
+          reactions : ['👍'],
+          matchID: challengedMember.id
+        });
 
-    let challengedMember = message.mentions.users.first();
-    if (challengedMember.user.bot || challengedMember.id === message.author.id) { // If they challenge a bot or themselves
-      this.addPlayer(client.user.id, {symbol: 'O'}); // We add the bot
-      this.multiplayer = false;
-    } else { // They challenged another player, so we send the challenge to the channel
-      await this.prompt(client, `${challengedMember}, you have been challenged to play Tic Tac Toe! Tap 👍 to accept.`, {
-        reactions : ['👍'],
-        matchID: challengedMember.id
-      });
-
-      this.addPlayer(challengedMember, {symbol: 'O'});
-      this.multiplayer = true;
+        if (this.status === 'ended') return;
+  
+        this.addPlayer(challengedMember, { symbol: 'O' });
+        this.multiplayer = true;
+      }
     }
 
     this.start(client);
   }
 
+  /**
+   * The players have all been added to the game, so now we are ready to start and confirm all of the settings.
+   * @param {Client} client - The logged in client
+   */
   async start(client) {
-    if (!this.multiplayer) await this.setDifficulty();
-    await this.setP1GoesFirst();
+    if (!this.multiplayer && this.difficulty !== undefined) { // We set the difficulty
+      let difficulty = await this.prompt(client, 'Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
+        reactions: ['🇪', '🇲', '🇭'],
+        matchID: this.players.get(0).member.id
+      });
+    
+      this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[difficulty.first().emoji.name];
+    }
+    
+    let firstOrSecond = await this.prompt(client, 'Do you want to go first or second?', {
+      reactions: ['1⃣', '2⃣'],
+      matchID: this.players.get(0).member.id
+    });
   
-    this.boardMessage = await this.getChannel().send({embed: this.boardEmbed()});
+    if (!firstOrSecond.has('1⃣')) this.nextPlayer();
+    
+    this.channel.send(`${this.currPlayer.member}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
   
-    if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.players.get(0).symbol)) this.aiMove();
+    this.boardMessage = await this.channel.send({ embed: this.boardEmbed });
+  
+    if (!this.multiplayer && !(this.currentPlayer.symbol === 'X')) this.aiMove();
     await this.resetReactions();
   
     this.nextMove(client);
-  }
-
-  async setDifficulty(client, difficulty) {
-    let collected;
-    if (typeof difficulty === 'undefined')
-      collected = await this.prompt(client, 'Don\'t worry, I don\'t have friends either. Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
-        reactions: ['🇪', '🇲', '🇭'],
-        matchID: this.players.get(0).userID
-      });
-  
-    this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[collected.first().emoji.name];
-  }
-
-  async setP1GoesFirst(client, p1GoesFirst) {
-    let collected;
-    if (typeof p1GoesFirst === 'undefined')
-      collected = await this.prompt(client, 'Do you want to go first or second?', {
-        reactions: ['1⃣', '2⃣'],
-        matchID: this.players.get(0).user.id
-      });
-  
-    if (!collected.has('1⃣')) this.nextPlayer();
-    
-    this.currentState.currentPlayerSymbol = this.currentPlayer.symbol;
-    this.channel.send(`${this.currPlayer.user.displayName}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
   }
   
   async resetReactions(client, msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
@@ -176,21 +164,20 @@ class TicTacToeGame extends Game {
   
       let ind = row * 3 + col;
       if (this.currentState.contents[ind] !== ' ')
-        return this.getChannel().send('That is not a valid move!');
-      let next = new BoardGameState(this.currentState);
-      next.contents[ind] = this.currentState.currentPlayerSymbol;
-      next.currentPlayerSymbol = next.currentPlayerSymbol === 'X' ? 'O' : 'X';
-      this.advanceTo(next);
-  
-      if (!this.multiplayer && !(this.currentState.currentPlayerSymbol === this.players.get(0).symbol))
+        return this.channel.send('That is not a valid move!');
+
+      this.currentState.insert(ind, this.currPlayer.symbol);
+      
+      if (!this.multiplayer && !(this.currentPlayer.symbol === 'X'))
         this.aiMove();
   
       this.resetReactions();
     });
   
-    this.collector.on('end',(collected, reason) => {
+    this.collector.on('end', (collected, reason) => {
       if (reason === 'game over') return;
       this.sendCollectorEndedMessage(client, reason);
+      this.end(client); // Since there's no way for the users to create a new collector besides starting a new game
     });
   }
 
@@ -201,8 +188,8 @@ class TicTacToeGame extends Game {
     const embed = new RichEmbed()
       .setTimestamp()
       .setTitle('Tic Tac Toe')
-      .addField('Players', `${this.players.map(p => `${p.user}(${p.symbol})`).join(' vs ')}`)
-      .addField('Grid', this.currentState.grid())
+      .addField('Players', `${this.players.map(p => `${p.user} (${p.symbol})`).join(' vs ')}`)
+      .addField('Grid', this.currentState.grid)
       .setFooter('Type ".ttt help" to get help about this function.');
     return embed;
   }
@@ -214,12 +201,12 @@ class TicTacToeGame extends Game {
    */
   advanceTo(client, state) {
     this.currentState = state;
-    this.boardMessage.edit({embed: this.boardEmbed()});
-    const term = this.currentState.isTerminal();
-    this.currentState.result = term ? term : 'running';
+    this.boardMessage.edit({ embed: this.boardEmbed });
+    const term = this.currentState.isTerminal;
     this.nextPlayer();
-    if (/(?:X|O)-won|draw/i.test(this.currentState.result)) {
-      this.status = 'ended';
+
+    // If somebody won
+    if (/(?:X|O)-won|draw/i.test(term)) {
       this.getChannel().send(`${this.currPlayer.user} won! GG`);
       this.collector.stop('game over');
       this.boardMessage.clearReactions();
@@ -232,32 +219,73 @@ class TicTacToeGame extends Game {
    */
   aiMove() {
     const available = this.currentState.emptyCells;
-    let action;
+    let bestMove;
   
     if (this.difficulty === 1) { // We randomly choose a cell
-      let randomCell = available[Math.floor(Math.random() * available.length)];
-      action = new AIAction(randomCell);
+      bestMove = available[Math.floor(Math.random() * available.length)];
     } else {
       // We create an array of the available actions, applying each one to the current state
       let availableActions = available.map(pos => {
-        let availableAction = new AIAction(pos); // We create a new AIAction for the given position
-        let nextState = availableAction.applyTo(this.currentState, this.switchSymbol(this.players.get(0).symbol));
-        availableAction.minimaxVal = AIAction.minimaxValue(nextState, this.players.get(0).symbol);
-        return availableAction;
+        let nextState = this.currentState.clone().insert(pos, 'O');
+        return { idx: pos, minimaxVal: this.alphabeta(nextState, available.length, -Infinity, Infinity, true) };
       });
   
-      // Descending if it is currently the human player's turn
-      availableActions.sort(AIAction.sort(this.currentState.currentPlayerSymbol === this.players.get(0).symbol ? -1 : 1));
+      // If it is currently the human player's turn, we want the move with the lowest, so we sort descending;
+      availableActions.sort(this.sort(this.currentPlayer.symbol === 'X' ? -1 : 1));
   
-      action = (this.difficulty === 2 ?
+      bestMove = (this.difficulty === 2 ?
         ((Math.random() * 100 <= 40) ? // A 40% chance of choosing the best move
           availableActions[0] :
           ((availableActions.length >= 2) ? availableActions[1] : availableActions[0])) : // Otherwise we choose the second-best move, if there is one
         availableActions[0]); // If the difficulty is 3, we always choose the best move
     }
   
-    let next = action.applyTo(this.currentState, this.switchSymbol(this.players.get(0).symbol));
-    this.advanceTo(next);
+    this.currentState.insert(bestMove, this.aiSymbol);
+  }
+
+  /**
+   * Basically, if the next player is human we want to minimize the value, and if it is the AI we want to maximize the value.
+   * This is mostly ripped off the pseudocode example on the Wikipedia page on alpha-beta pruning
+   * @param {BoardGameState} node - the current state
+   * @param {number} depth 
+   * @param {number} a 
+   * @param {number} b 
+   * @param {boolean} maximizingPlayer 
+   */
+  alphabeta(node, depth, a, b, maximizingPlayer) {
+    if (depth === 0 || node.isTerminal)
+      return node.score;
+    if (maximizingPlayer) {
+      let value = -Infinity;
+      for (let child of node.emptyCells.map(idx => node.clone().insert(idx, 'O'))) {
+        value = Math.max(value, this.alphabeta(child, depth - 1, a, b, false));
+        a = Math.max(a, value);
+        if (a >= b)
+          break; // (* b cut-off *)
+      }
+      return value;
+    } else {
+      let value = Infinity; //TODO: human or bot symbol?
+      for (let child of node.emptyCells.map(idx => node.clone().insert(idx, 'X'))) {
+        value = Math.min(value, this.alphabeta(child, depth - 1, a, b, true));
+        b = Math.min(b, value);
+        if (a >= b)
+          break; // (* a cut-off *)
+      }
+      return value;
+    }
+  }
+
+  /**
+   * @param {number} direction - 1 for ascending, -1 for descending
+   * @returns a function that can be passed to the Array.sort method to sort actions by their minimax values
+   */
+  sort(direction) {
+    return (firstAction, secondAction) => {
+      if (firstAction.minimaxVal < secondAction.minimaxVal) return -direction;
+      else if (firstAction.minimaxVal > secondAction.minimaxVal) return direction;
+      else return 0;
+    };
   }
 
   /** Simply returns the other symbol */

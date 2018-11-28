@@ -1,4 +1,4 @@
-/*
+/**
  * This is the entry point for GamesBot, a discord bot in javascript using the discord.js library.
  * It was first created by Alexander Cai in 2017.
  * It's main purpose is to provide entertainment to discord users by allowing them to play board games directly in discord.
