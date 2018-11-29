@@ -46,7 +46,7 @@ class Game {
    */
   sendCollectorEndedMessage(client, reason) {
     let settings = client.mongodb.collection(this.channel.guild.id).findOne({ _id: 0 });
-    this.send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type \
+    this.channel.send(`Collector ended. ${reason ? `Reason: ${reason}. ` : ''}Your game has been cancelled. Type \
     "${settings.prefix}${this.type} cancel" to cancel this game \
     and then type ${settings.prefix}${this.type} to start a new one.`);
 
@@ -123,7 +123,7 @@ class Game {
         flag: 'c',
         usage: 'If the user is in a game, cancels it',
         action: function (client, message, args) {
-          if (args.includes('c')) this.end(client);
+          if (args.includes('c') && client.games.find(game => game.players.members.find(m => m.id = message.member.id))) this.end(client);
         }
       }
     }, options);

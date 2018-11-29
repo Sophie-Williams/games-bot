@@ -19,7 +19,14 @@ class TicTacToeGame extends Game {
   }
 
   static get type() { return 'tictactoe'; }
+  static get defaultWinScore() { return 200; }
 
+  /**
+   * Responds to a message. Remember, since this is static, this does NOT refer to the game; it refers to the TicTacToeGame object.
+   * @param {Client} client - The logged in client
+   * @param {Message} message - The message to respond to
+   * @param {args} args - The arguments passed by the user
+   */
   static run(client, message, args) {
     let game = client.games.find(game => game.players.has(message.author.id) && game.type === 'tictactoe');
     if (!game) { // If the player is not in a game of this type
@@ -38,7 +45,10 @@ class TicTacToeGame extends Game {
 
   /**
    * The players have all been added to the game, so now we are ready to start and confirm all of the settings.
+   * This is the main body of the class. We check all the args for the settings, and then create a reaction collector
+   * on the board message to receive user input.
    * @param {Client} client - The logged in client
+   * @param {Message} message - The message to respond to
    */
   async start(client, message) {
     this.status = 'running';
@@ -96,24 +106,7 @@ class TicTacToeGame extends Game {
   
     if (!this.multiplayer && !(this.currPlayer.symbol === 'X')) this.aiMove();
     await this.resetReactions();
-  
-    this.nextMove(client);
-  }
-  
-  /**
-   * We reset the reactions on the board message so that the user can click to their next move.
-   */
-  async resetReactions() {
-    await this.boardMessage.clearReactions(); // We clear the reactions
-    for (let emoji of Object.keys(this.reactions)) await this.boardMessage.react(emoji);
-  }
 
-  async areReactionsReset(msg=this.boardMessage, reactions=Object.keys(this.reactions)) {
-    const reactedEmojis = msg.reactions.map(re => re.emoji.name);
-    return(reactions.every(emoji => reactedEmojis.includes(emoji)));
-  }
-
-  async nextMove(client) {
     let reactionFilter = (r, emoji) => r.message.reactions.get(emoji) ? r.message.reactions.get(emoji).users.has(this.currPlayer.member.id) : false;
   
     this.collector = this.boardMessage.createReactionCollector(r => {
@@ -147,6 +140,19 @@ class TicTacToeGame extends Game {
       this.end(client); // Since there's no way for the users to create a new collector besides starting a new game
     });
   }
+  
+  /**
+   * We reset the reactions on the board message so that the user can click to their next move.
+   */
+  async resetReactions() {
+    await this.boardMessage.clearReactions(); // We clear the reactions
+    for (let emoji of Object.keys(this.reactions)) await this.boardMessage.react(emoji);
+  }
+
+  async areReactionsReset(msg=this.boardMessage, reactions=Object.keys(this.reactions)) {
+    const reactedEmojis = msg.reactions.map(re => re.emoji.name);
+    return(reactions.every(emoji => reactedEmojis.includes(emoji)));
+  }
 
   /**
    * The embed displaying the current board state
@@ -155,7 +161,7 @@ class TicTacToeGame extends Game {
     const embed = new RichEmbed()
       .setTimestamp()
       .setTitle('Tic Tac Toe')
-      .addField('Players', `${this.players.map(p => `${p.member} (${p.symbol})`).join(' vs ')}`)
+      .addField('Players', `${this.players ? this.players.map(p => `${p.member} (${p.symbol})`).join(' vs '): 'None'}`)
       .addField('Grid', this.currentState.grid)
       .setFooter('Type ".ttt help" to get help about this function.');
     return embed;
@@ -189,7 +195,7 @@ class TicTacToeGame extends Game {
     let bestMove;
   
     if (this.difficulty === 1) { // We randomly choose a cell
-      bestMove = available[Math.floor(Math.random() * available.length)];
+      bestMove = { idx: available[Math.floor(Math.random() * available.length)] };
     } else {
       // We create an array of the available actions, applying each one to the current state
       let availableActions = available.map(pos => {
@@ -197,8 +203,8 @@ class TicTacToeGame extends Game {
         return { idx: pos, minimaxVal: this.alphabeta(nextState, available.length, -Infinity, Infinity, true) };
       });
   
-      // If it is currently the human player's turn, we want the move with the lowest, so we sort descending;
-      availableActions.sort(this.sort(this.currPlayer.symbol === 'X' ? -1 : 1));
+      // We want the move with the highest, so we sort descending;
+      availableActions.sort(this.sort);
   
       bestMove = (this.difficulty === 2 ?
         ((Math.random() * 100 <= 40) ? // A 40% chance of choosing the best move
@@ -215,27 +221,28 @@ class TicTacToeGame extends Game {
    * This is mostly ripped off the pseudocode example on the Wikipedia page on alpha-beta pruning
    * @param {BoardGameState} node - the current state
    * @param {number} depth 
-   * @param {number} a 
-   * @param {number} b 
+   * @param {number} a - The highest value that the AI can guarantee at a certain depth
+   * @param {number} b - The lowest value that the AI can guarantee at a certain depth
    * @param {boolean} maximizingPlayer 
    */
   alphabeta(node, depth, a, b, maximizingPlayer) {
     if (depth === 0 || node.isTerminal)
       return node.score;
+    
     if (maximizingPlayer) {
       let value = -Infinity;
       for (let child of node.emptyCells.map(idx => node.clone().insert(idx, 'O'))) {
         value = Math.max(value, this.alphabeta(child, depth - 1, a, b, false));
         a = Math.max(a, value);
         if (a >= b)
-          break; // (* b cut-off *)
+          break; // If the largest value is greater than the (* b cut-off *)
       }
       return value;
-    } else {
-      let value = Infinity; //TODO: human or bot symbol?
+    } else { // We're trying to minimize the value
+      let value = Infinity; // We set it to the largest possible value
       for (let child of node.emptyCells.map(idx => node.clone().insert(idx, 'X'))) {
         value = Math.min(value, this.alphabeta(child, depth - 1, a, b, true));
-        b = Math.min(b, value);
+        b = Math.min(b, value); // 
         if (a >= b)
           break; // (* a cut-off *)
       }
@@ -247,12 +254,10 @@ class TicTacToeGame extends Game {
    * @param {number} direction - 1 for ascending, -1 for descending
    * @returns a function that can be passed to the Array.sort method to sort actions by their minimax values
    */
-  sort(direction) {
-    return (firstAction, secondAction) => {
-      if (firstAction.minimaxVal < secondAction.minimaxVal) return -direction;
-      else if (firstAction.minimaxVal > secondAction.minimaxVal) return direction;
-      else return 0;
-    };
+  sort(firstAction, secondAction) {
+    if (firstAction.minimaxVal < secondAction.minimaxVal) return 1;
+    else if (firstAction.minimaxVal > secondAction.minimaxVal) return -1;
+    else return 0;
   }
 
   /** Simply returns the other symbol */
@@ -280,7 +285,10 @@ TicTacToeGame.options = Game.createOptions({
 
         let diff = args[idx+1];
         [/^e(?:asy)|1$/i, /^m(?:edium)|2$/i, /^h(?:ard)|3$/i].forEach((re, i) => {
-          if (re.test(diff)) this.difficulty = i+1;
+          if (re.test(diff)) {
+            this.multiplayer = false;
+            this.difficulty = i+1;
+          }
         });
       });
     }
