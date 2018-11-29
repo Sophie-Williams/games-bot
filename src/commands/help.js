@@ -29,7 +29,7 @@ module.exports = {
       // We get the options of the command and add their usages into an array
       if (cmd.options) {
         let options = [];
-        Object.getOwnPropertyNames(cmd.options).forEach(param => {
+        Object.keys(cmd.options).forEach(param => {
           let data = cmd.options[param]; // If it's required, we underline it; if there's a flag, we bold it; if there's not no param, we add the param
           options.push(`${data.required ? `__${param}__` : `${data.flag ? `**${data.flag}**` : ''} ${data.noParam ? '' : `__${param}__`}`}
             - ${data.desc}`);
@@ -57,7 +57,7 @@ module.exports = {
     
     // For each command, if it is not an alias (copy), we add the prefix followed by the description
     client.commands.forEach(cmd => {
-      if (cmd.alias) return;
+      if (cmd.aliases.includes(cmd)) return;
       cmds.addField(prefix + cmd.usage, cmd.desc);
     });
 

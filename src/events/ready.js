@@ -9,6 +9,11 @@ module.exports = client => {
   });
 };
 
+/**
+ * 
+ * @param {Client} client - the logged in client
+ * @param {GuildMember} member - the guild member being asserted
+ */
 function assertMember(client, member) {
   client.debug(`Asserting member ${member.user.username}`);
   client.mongodb.collection(member.guild.id).findOne({ _id: member.id }, (err, res) => {

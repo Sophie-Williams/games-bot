@@ -2,78 +2,46 @@ const { RichEmbed } = require('discord.js');
 const Game = require('./Game.js');
 const BoardGameState = require('./BoardGameState.js');
 
-module.exports = {
-  aliases: ['ttt'],
-  desc: 'Plays Tic Tac Toe! Type .help tictactoe for more info.',
-  options: {
-    singleplayer: {
-      flag: 's',
-      desc: 'Starts a singleplayer game.',
-      action: function() {
-        this.multiplayer = false;
-      }
-    },
-    difficulty: {
-      flag: 'd',
-      desc: 'Sets the difficulty to __difficulty__. Assumes **-s**.',
-      action: function(client, m, args, ind) {
-        let diff = args[ind+1];
-        [/^e(?:asy)|1$/i, /^m(?:edium)|2$/i, /^h(?:ard)|3$/i].forEach((re, i) => {
-          if (re.test(diff)) this.difficulty = i+1;
-        });
-      }
-    },
-    startingturn: {
-      flag: 't',
-      desc: 'Begins the game with you as the __startingturn__th player.',
-      action: function(client, m, args, ind) {
-        let goFirst = args[ind+1];
-        if ((/^t(?:rue)|y(?:es)|1$/).test(goFirst))
-          this.p1GoesFirst = true;
-        else if ((/^f(?:alse)|n(?:o)|2$/).test(goFirst))
-          this.p1GoesFirst = false;
-      }
-    },
-    view: {
-      flag: 'v',
-      usage: 'Resends the game board',
-      action: async function () {
-        const msg = await this.channel.send({embed: this.boardEmbed()});
-        this.boardMessage = msg;
-      }
-    }
-  },
-  run: async (client, message, args) => { // This gets called by a message
-    let game = client.games.find(game => game.players.find(player => player.userID === message.author.id) && game.type === 'tictactoe'); // In the database, we look for a game with the message's author as a player
-    if (!game) { // If it doesn't exist,
-      let id = Math.random().toString(36).substr(2, 9); // we randomly generate an id by getting a random float and mapping each digit to a char value
-      client.games.set(id, new TicTacToeGame(id, message)); // and create one!
-      game = client.games.get(id);
-      game.init(client, message);
-    }
-    game.run(client, message, args);
-  }
-};
-
 /**
  * Plays Tic Tac Toe!
  */
 class TicTacToeGame extends Game {
-  constructor(id, message) {
+  /**
+   * 
+   * @param {string} id 
+   * @param {Message} message 
+   */
+  constructor(client, message, args, id) {
     super(id);
     this.channel = message.channel;
-    this.type = 'tictactoe';
     this.reactions = { '🇦': 0, '🇧': 1, '🇨': 2, '1⃣': 2, '2⃣': 1, '3⃣': 0 };
     this.currentState = new BoardGameState();
   }
 
+  static get type() { return 'tictactoe'; }
+
+  static run(client, message, args) {
+    let game = client.games.find(game => game.players.has(message.author.id) && game.type === 'tictactoe');
+    if (!game) { // If the player is not in a game of this type
+      let id = Math.random().toString(36).substr(2, 9); // We randomly generate an id by getting a random float and mapping each digit to a char value
+      client.games.set(id, new TicTacToeGame(client, message, args, id));
+      game = client.games.get(id);
+      client.debug('New Tic Tac Toe Game created');
+    }
+
+    Object.values(this.options).forEach(opt => {
+      opt.action.call(game, client, message, args);
+    });
+
+    if (game.status !== 'running') game.start(client, message);
+  }
+
   /**
-   * We essentially start the game, adding the original player
-   * @param {Client} client 
-   * @param {Message} message 
+   * The players have all been added to the game, so now we are ready to start and confirm all of the settings.
+   * @param {Client} client - The logged in client
    */
-  async init(client, message) {
-    client.debug('New Tic Tac Toe game created');
+  async start(client, message) {
+    this.status = 'running';
     this.addPlayer(message.member, { symbol: 'X' }); // The person who sends the message will always be x
     
     if (this.multiplayer === false) { // If the multiplayer has been *set* to false
@@ -101,16 +69,8 @@ class TicTacToeGame extends Game {
       }
     }
 
-    this.start(client);
-  }
-
-  /**
-   * The players have all been added to the game, so now we are ready to start and confirm all of the settings.
-   * @param {Client} client - The logged in client
-   */
-  async start(client) {
-    if (!this.multiplayer && this.difficulty !== undefined) { // We set the difficulty
-      let difficulty = await this.prompt(client, 'Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
+    if (!this.multiplayer && this.difficulty === undefined) { // We set the difficulty
+      let difficulty = await this.prompt(client, this.channel, 'Do you want me to go 🇪asy, 🇲edium, or 🇭ard?', {
         reactions: ['🇪', '🇲', '🇭'],
         matchID: this.players.get(0).member.id
       });
@@ -118,27 +78,34 @@ class TicTacToeGame extends Game {
       this.difficulty = { '🇪': 1, '🇲': 2, '🇭': 3 }[difficulty.first().emoji.name];
     }
     
-    let firstOrSecond = await this.prompt(client, 'Do you want to go first or second?', {
-      reactions: ['1⃣', '2⃣'],
-      matchID: this.players.get(0).member.id
-    });
-  
-    if (!firstOrSecond.has('1⃣')) this.nextPlayer();
+    // eslint-disable-next-line no-empty
+    if (this.p1GoesFirst) {
+    } else if (this.p1GoesFirst === false) {
+      this.nextPlayer();
+    } else {
+      let firstOrSecond = await this.prompt(client, this.channel, 'Do you want to go first or second?', {
+        reactions: ['1⃣', '2⃣'],
+        matchID: this.players.get(0).member.id
+      });
     
-    this.channel.send(`${this.currPlayer.member}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
-  
+      if (!firstOrSecond.has('1⃣')) this.nextPlayer(); // We simply set the current player to the next player  
+    }
+        
+    this.channel.send(`${this.currPlayer.member.displayName}, your turn! React with the coordinates of the square you want to move in, e.x. "🇧2⃣".`);
     this.boardMessage = await this.channel.send({ embed: this.boardEmbed });
   
-    if (!this.multiplayer && !(this.currentPlayer.symbol === 'X')) this.aiMove();
+    if (!this.multiplayer && !(this.currPlayer.symbol === 'X')) this.aiMove();
     await this.resetReactions();
   
     this.nextMove(client);
   }
   
-  async resetReactions(client, msg=this.boardMessage, emojis=Object.keys(this.reactions)) {
-    await msg.clearReactions();
-    for(let emoji of emojis)
-      await msg.react(emoji);
+  /**
+   * We reset the reactions on the board message so that the user can click to their next move.
+   */
+  async resetReactions() {
+    await this.boardMessage.clearReactions(); // We clear the reactions
+    for (let emoji of Object.keys(this.reactions)) await this.boardMessage.react(emoji);
   }
 
   async areReactionsReset(msg=this.boardMessage, reactions=Object.keys(this.reactions)) {
@@ -147,11 +114,11 @@ class TicTacToeGame extends Game {
   }
 
   async nextMove(client) {
-    let reactionFilter = (r, emoji) => r.message.reactions.get(emoji).users.has(this.currPlayer.user.id);
+    let reactionFilter = (r, emoji) => r.message.reactions.get(emoji) ? r.message.reactions.get(emoji).users.has(this.currPlayer.member.id) : false;
   
     this.collector = this.boardMessage.createReactionCollector(r => {
       if (this.status !== 'running') return;
-      if (this.currPlayer.user.id === client.user.id) return; // If the current player is the bot
+      if (this.currPlayer.member.id === client.user.id) return; // If the current player is the bot
       if (!this.areReactionsReset(r.message)) return; // If reactions have not yet been reset
       const rowSelected = ['1⃣', '2⃣', '3⃣'].some(row => reactionFilter(r, row));
       const colSelected = ['🇦', '🇧', '🇨'].some(col => reactionFilter(r, col));
@@ -166,10 +133,10 @@ class TicTacToeGame extends Game {
       if (this.currentState.contents[ind] !== ' ')
         return this.channel.send('That is not a valid move!');
 
-      this.currentState.insert(ind, this.currPlayer.symbol);
+      this.move(client, ind);
       
-      if (!this.multiplayer && !(this.currentPlayer.symbol === 'X'))
-        this.aiMove();
+      if (!this.multiplayer && !(this.currPlayer.symbol === 'X'))
+        this.aiMove(client);
   
       this.resetReactions();
     });
@@ -188,7 +155,7 @@ class TicTacToeGame extends Game {
     const embed = new RichEmbed()
       .setTimestamp()
       .setTitle('Tic Tac Toe')
-      .addField('Players', `${this.players.map(p => `${p.user} (${p.symbol})`).join(' vs ')}`)
+      .addField('Players', `${this.players.map(p => `${p.member} (${p.symbol})`).join(' vs ')}`)
       .addField('Grid', this.currentState.grid)
       .setFooter('Type ".ttt help" to get help about this function.');
     return embed;
@@ -199,15 +166,15 @@ class TicTacToeGame extends Game {
    * @param {Client} client 
    * @param {BoardGameState} state 
    */
-  advanceTo(client, state) {
-    this.currentState = state;
+  move(client, ind) {
+    this.currentState.insert(ind, this.currPlayer.symbol);
     this.boardMessage.edit({ embed: this.boardEmbed });
     const term = this.currentState.isTerminal;
     this.nextPlayer();
 
     // If somebody won
     if (/(?:X|O)-won|draw/i.test(term)) {
-      this.getChannel().send(`${this.currPlayer.user} won! GG`);
+      this.channel.send(`${this.currPlayer.member} won! GG`);
       this.collector.stop('game over');
       this.boardMessage.clearReactions();
       this.end(client, this.currPlayer, this.iter.next().value);
@@ -217,7 +184,7 @@ class TicTacToeGame extends Game {
   /**
    * Makes a move for the bot.
    */
-  aiMove() {
+  aiMove(client) {
     const available = this.currentState.emptyCells;
     let bestMove;
   
@@ -231,7 +198,7 @@ class TicTacToeGame extends Game {
       });
   
       // If it is currently the human player's turn, we want the move with the lowest, so we sort descending;
-      availableActions.sort(this.sort(this.currentPlayer.symbol === 'X' ? -1 : 1));
+      availableActions.sort(this.sort(this.currPlayer.symbol === 'X' ? -1 : 1));
   
       bestMove = (this.difficulty === 2 ?
         ((Math.random() * 100 <= 40) ? // A 40% chance of choosing the best move
@@ -240,7 +207,7 @@ class TicTacToeGame extends Game {
         availableActions[0]); // If the difficulty is 3, we always choose the best move
     }
   
-    this.currentState.insert(bestMove, this.aiSymbol);
+    this.move(client, bestMove.idx);
   }
 
   /**
@@ -293,3 +260,54 @@ class TicTacToeGame extends Game {
     return symbol === 'X' ? 'O' : 'X';
   }
 }
+
+TicTacToeGame.aliases = ['ttt'];
+TicTacToeGame.desc = 'Plays Tic Tac Toe! Type .help tictactoe for more info.';
+TicTacToeGame.options = Game.createOptions({
+  singleplayer: {
+    flag: 's',
+    desc: 'Starts a singleplayer game.',
+    action: function(client, m, args) {
+      if (args.includes('s')) this.multiplayer = false;
+    }
+  },
+  difficulty: {
+    flag: 'd',
+    desc: 'Sets the difficulty to __difficulty__. Assumes **-s**.',
+    action: function(client, m, args) {
+      args.forEach((arg, idx) => {
+        if (arg !== 'd') return;
+
+        let diff = args[idx+1];
+        [/^e(?:asy)|1$/i, /^m(?:edium)|2$/i, /^h(?:ard)|3$/i].forEach((re, i) => {
+          if (re.test(diff)) this.difficulty = i+1;
+        });
+      });
+    }
+  },
+  startingturn: {
+    flag: 't',
+    desc: 'Begins the game with you as the __startingturn__th player.',
+    action: function(client, m, args) {
+      args.forEach((arg, idx) => {
+        if (arg !== 't') return;
+
+        let goFirst = args[idx+1];
+        if ((/^t(?:rue)|y(?:es)|1$/).test(goFirst))
+          this.p1GoesFirst = true;
+        else if ((/^f(?:alse)|n(?:o)|2$/).test(goFirst))
+          this.p1GoesFirst = false;
+      });
+    }
+  },
+  view: {
+    flag: 'v',
+    usage: 'Resends the game board',
+    action: async function (client, message, args) {
+      if (args.includes('v'))
+        this.boardMessage = await this.channel.send({ embed: this.boardEmbed });
+    }
+  }
+});
+
+module.exports = TicTacToeGame;

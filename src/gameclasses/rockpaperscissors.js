@@ -27,7 +27,7 @@ class RockPaperScissorsGame extends Game {
    * @param {Message} message 
    * @param {string[]} args 
    */
-  async run(client, message, args) {
+  static async run(client, message, args) {
     super.run(client, message, args);
     
     if (message.mentions.members.size > 0) {// If someone gets mentioned, we play against the first mention
@@ -69,6 +69,10 @@ class RockPaperScissorsGame extends Game {
     }
   }
 
+  static init(client, message, args, id) {
+    client.games.set(id, new RockPaperScissorsGame());
+  }
+
   async prompt(client, channel, matchID) {
     let collected = await super.prompt(client, channel, 'Would you like to show 🇷ock, 🇵aper, or 🇸cissors?', { reactions: Object.keys(reactions), matchID });
     await channel.send(`You chose ${words[reactions[collected.first().emoji.name]]}.`);
@@ -76,23 +80,13 @@ class RockPaperScissorsGame extends Game {
   }
 }
 
+RockPaperScissorsGame.aliases = ['rps'];
+RockPaperScissorsGame.desc = 'Plays rock paper scissors';
 RockPaperScissorsGame.type = 'rockpaperscissors';
+RockPaperScissorsGame.options = Game.createOptions({
+  '@opponent': {
+    desc: 'The person to play against'
+  }
+});
 
-module.exports = {
-  aliases: ['rps'],
-  desc: 'Plays rock paper scissors',
-  options: {
-    '@opponent': {
-      desc: 'The person to play against'
-    }
-  },
-  run: async (client, message, args) => { // This gets called by a message
-    let game = client.games.find(game => game.players.has(message.author.id) && game.type === 'rockpaperscissors');
-    if (!game) { // If the player is not in a rock paper scissors game
-      let id = Math.random().toString(36).substr(2, 9); // We randomly generate an id by getting a random float and mapping each digit to a char value
-      client.games.set(id, new RockPaperScissorsGame(id, message));
-    }
-    game.run(client, message, args); // From the prototype chain; loops through the options and applies the args
-  },
-  dev: true
-};
+module.exports = RockPaperScissorsGame;

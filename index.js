@@ -40,27 +40,27 @@ client.games = new Collection();
  */
 function loadFile(fileType, file) {
   let data = require(`./src/${fileType}/${file}`);
-  let name = data.name || file.split('.')[0]; // If the command has a name, we set it to that, otherwise it's the filename without the extension
+  let name = file.split('.')[0]; // If the command has a name, we set it to that, otherwise it's the filename without the extension
 
   client.debug(`Loading ./src/${fileType}/${file}`);
   if (fileType === 'events') {
     client.on(name, data.bind(null, client));
   } else { // Commands and game classes are treated separately
     if (!data.run) return; // We quit if the file is not a command
-    if (data.options) { // We generate the usage for each option
-      let usage = data.aliases ? [name, ...data.aliases].join('|') : name; // First joining the command name with its aliases
-      Object.getOwnPropertyNames(data.options).forEach(param => { // Then we go through its options and add each one accordingly
-        let opt = data.options[param];
-        if (opt.required) // If it's required, we underline it and the description
-          usage += ` __${param}__`;
-        else // It's optional, so we surround it with brackets
-          usage += ` [${((opt.flag ? `**${opt.flag}** ` : '') + (opt.noParam ? '' : `__${param}__`)).trim()}]`;
-      });
-      Object.assign(data, { usage });
-    }
+    data.usage = data.aliases ? [name, ...data.aliases].join('|') : name; // First joining the command name with its aliases
+    
+    data.options = data.options || {}; // We generate the usage for each option, setting it to an empty array to prevent needing to check before forEach loops later
+    Object.keys(data.options).forEach(param => { // We go through its options and add each one accordingly
+      let opt = data.options[param];
+      if (opt.required) // If it's required, we underline it and the description
+        data.usage += ` __${param}__`;
+      else // It's optional, so we surround it with brackets
+        data.usage += ` [${((opt.flag ? `**${opt.flag}** ` : '') + (opt.noParam ? '' : `__${param}__`)).trim()}]`;
+    });
+
     client.commands.set(name, data);
     if (data.aliases) data.aliases.forEach(alias => // We set the aliases onto client.commands as well
-      client.commands.set(alias, Object.assign({}, data, { alias: true }))
+      client.commands.set(alias, data)
     );
   }
 

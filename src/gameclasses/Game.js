@@ -4,7 +4,6 @@ const { Collection } = require('discord.js');
  * This is the parent class for all games in the program.
  * Javascript does not support abstract classes, but this class should never
  * be instantiated directly.
- * @param {Object} data 
  */
 class Game {
   /**
@@ -15,37 +14,6 @@ class Game {
     this.id = id;
     this.players = new Collection();
     this.status = 'beginning';
-    this.options = {
-      leave: {
-        flag: 'l',
-        usage: 'Leaves the game',
-        action: function (client, message) {
-          this.channel.send(`${message.author} has left the game!`);
-          this.players.sweep(player => player.userID === message.member.id); // We remove the player from the players collection
-        }
-      },
-      cancel: {
-        flag: 'c',
-        usage: 'If the user is in a game, cancels it',
-        action: function (client) {
-          this.end(client);
-        }
-      }
-    };
-  }
-
-  /**
-   * This is the function called when a user sends a message beginning with this command. We go through the args and see
-   * if any of them match an option, and if they do we call it.
-   * @param {Client} client - The logged in client
-   * @param {Message} message - The message
-   * @param {string[]} args - The arguments passed
-   */
-  run(client, message, args) {
-    this.status = 'running';
-    for (let i = 0; i < args.length; i++)
-      if (this.options.hasOwnProperty(args[i]))
-        this.options[args[i]].action.call(this, client, message, args, i);
   }
 
   /**
@@ -105,26 +73,27 @@ class Game {
 
       server.updateOne({ _id: winner.id }, { $inc: { score: scoreChange }});
 
-      // If losing means their score goes below 0, we set it to 0
+      // If losing means their score goes below 0, we set it to 0, else we decrement it by the score change
       let score = (loserScore - scoreChange < 0) ? 0 : loserScore - scoreChange;
-      server.updateOne({ $set: { score }});
+      server.updateOne({ _id: loser.id }, { $set: { score }});
     }
 
     this.status = 'ended';
-    this.send(`${this.players.map(p => p.user).join(', ')}, your ${this.cmd} games have ended.`);
+    this.channel.send(`${this.players.map(p => p.member).join(', ')}, your ${this.type} games have ended.`);
     client.games.delete(this.id); // Deletes this game from the player's list of games and leaves it to be garbage collected
   }
 
   /**
    * We add a player to this game's players collection.
    * @param {Client} client 
-   * @param {string} userID - The user ID of the Discord user to be added
+   * @param {string} member - The member to be added
    * @param {object} otherProperties - Other properties to be added on the creation of the player
    * @returns The player that was added
    */
-  addPlayer(client, member, otherProperties) {
+  addPlayer(member, otherProperties) {
     this.players.set(this.players.size, Object.assign({ member }, otherProperties)); // set to this.players.size is same as appending
     this.iter = this.players.values(); // Reset the iterator
+    this.currPlayer = this.iter.next().value;
     return this.players.get(this.players.size - 1);
   }
 
@@ -135,6 +104,29 @@ class Game {
       this.iter = this.players.values(); // we restart it
       this.currPlayer = this.iter.next().value; // and start to loop around again
     }
+    return this.currPlayer;
+  }
+
+  static createOptions(options) { // We simply assign the options onto the defaults
+    return Object.assign({
+      leave: {
+        flag: 'l',
+        usage: 'Leaves the game',
+        action: function (client, message, args) {
+          if (args.includes('l')) {
+            this.channel.send(`${message.member} has left the game!`);
+            this.players.sweep(player => player.userID === message.member.id); // We remove the player from the players collection
+          }
+        }
+      },
+      cancel: {
+        flag: 'c',
+        usage: 'If the user is in a game, cancels it',
+        action: function (client, message, args) {
+          if (args.includes('c')) this.end(client);
+        }
+      }
+    }, options);
   }
 }
 

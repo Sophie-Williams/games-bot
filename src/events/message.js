@@ -9,6 +9,11 @@ module.exports = async (client, message) => {
 
   // We get the settings for the server, which contains the server prefix
   let settings = await client.mongodb.collection(message.guild.id).findOne({ _id: 0 });
+  
+  // Checks if the bot was mentioned, with no message after it, returns the prefix.
+  const prefixMention = new RegExp(`^<@!?${client.user.id}>( |)$`);
+  if (message.content.match(prefixMention))
+    return message.reply(`My prefix on this guild is \`${settings.prefix}\``);
 
   // We don't respond to messages if they don't start with the server's prefix
   if (message.content.indexOf(settings.prefix) !== 0) return;

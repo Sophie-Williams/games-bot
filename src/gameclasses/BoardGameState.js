@@ -17,6 +17,7 @@ class BoardGameState {
   insert(idx, symbol) {
     if (idx > this.contents.length || this.contents[idx] !== ' ') return false; // If the spot is taken or the spot does not exist
     this.contents[idx] = symbol;
+    return this;
   }
 
   /** @returns a duplicate of the current state. */
@@ -72,10 +73,10 @@ class BoardGameState {
     let result = '';
     let numbers = ['zero', 'one', 'two', 'three'];
     
-    for (let row = 0; row < this.height; row++) {
-      result += `:${numbers[this.height - row]}:`;
-      for (let col = 0; col < this.width; col++)
-        result += this.emptyCells().includes(row * this.width + col) ? ':black_large_square:' : (this.contents[row * this.width + col] === 'X' ? ':regional_indicator_x:' : ':regional_indicator_o:');
+    for (let row = 0; row < 3; row++) {
+      result += `:${numbers[3 - row]}:`;
+      for (let col = 0; col < 3; col++)
+        result += this.emptyCells.includes(row * 3 + col) ? ':black_large_square:' : (this.contents[row * 3 + col] === 'X' ? ':regional_indicator_x:' : ':regional_indicator_o:');
       result += '\n';
     }
 
