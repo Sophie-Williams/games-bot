@@ -79,13 +79,7 @@ let exitHandler = exitCode => {
   client.info('MongoDB closed');
   if (exitCode !== undefined) client.info(exitCode);
   client.info('Shutting down');
-  process.exit();
+  process.exit(0);
 };
 
-process.on('SIGINT', exitHandler);
-process.on('SIGUSR1', exitHandler);
-process.on('SIGUSR2', exitHandler);
-process.on('uncaughtException', e => {
-  client.error(e.stack);
-  exitHandler('uncaughtException');
-});
+['SIGINT', 'SIGUSR1', 'SIGUSR2'].forEach(e => process.on(e, exitHandler));
