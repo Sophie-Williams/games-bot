@@ -4,7 +4,7 @@ const { combine, timestamp, colorize, json, simple } = format;
 const logger = createLogger({
   transports: [
     new transports.Console({
-      level: 'verbose',
+      level: 'debug',
       handleExceptions: true,
       json: false,
       format: combine(timestamp(), colorize(), json(), simple())

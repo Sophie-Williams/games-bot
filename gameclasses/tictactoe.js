@@ -21,26 +21,9 @@ class TicTacToeGame extends Game {
   static get type() { return 'tictactoe'; }
   static get defaultWinScore() { return 200; }
 
-  /**
-   * Responds to a message. Remember, since this is static, this does NOT refer to the game; it refers to the TicTacToeGame object.
-   * @param {Client} client - The logged in client
-   * @param {Message} message - The message to respond to
-   * @param {args} args - The arguments passed by the user
-   */
+  
   static run(client, message, args) {
-    let game = client.games.find(game => game.players.has(message.author.id) && game.type === 'tictactoe');
-    if (!game) { // If the player is not in a game of this type
-      let id = Math.random().toString(36).substr(2, 9); // We randomly generate an id by getting a random float and mapping each digit to a char value
-      client.games.set(id, new TicTacToeGame(client, message, args, id));
-      game = client.games.get(id);
-      client.debug('New Tic Tac Toe Game created');
-    }
-
-    Object.values(this.options).forEach(opt => {
-      opt.action.call(game, client, message, args);
-    });
-
-    if (game.status !== 'running') game.start(client, message);
+    super.generateRunCommand(client, message, args, TicTacToeGame);
   }
 
   /**
@@ -137,7 +120,6 @@ class TicTacToeGame extends Game {
     this.collector.on('end', (collected, reason) => {
       if (reason === 'game over') return;
       this.sendCollectorEndedMessage(client, reason);
-      this.end(client); // Since there's no way for the users to create a new collector besides starting a new game
     });
   }
   
@@ -163,7 +145,7 @@ class TicTacToeGame extends Game {
       .setTitle('Tic Tac Toe')
       .addField('Players', `${this.players ? this.players.map(p => `${p.member} (${p.symbol})`).join(' vs '): 'None'}`)
       .addField('Grid', this.currentState.grid)
-      .setFooter('Type ".ttt help" to get help about this function.');
+      .setFooter('Type "`.help tictactoe|ttt`" to get help about this function.');
     return embed;
   }
   
@@ -176,7 +158,6 @@ class TicTacToeGame extends Game {
     this.currentState.insert(ind, this.currPlayer.symbol);
     this.boardMessage.edit({ embed: this.boardEmbed });
     const term = this.currentState.isTerminal;
-    this.nextPlayer();
 
     // If somebody won
     if (/(?:X|O)-won|draw/i.test(term)) {
@@ -184,7 +165,7 @@ class TicTacToeGame extends Game {
       this.collector.stop('game over');
       this.boardMessage.clearReactions();
       this.end(client, this.currPlayer, this.iter.next().value);
-    }
+    } else this.nextPlayer();
   }
 
   /**

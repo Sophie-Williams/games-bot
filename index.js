@@ -6,18 +6,16 @@
  * Feel free to make a pull request or post any errors you find, even if it's just messy code.
  */
 
+// Loading modules
 const { Client, Collection } = require('discord.js');
 const { readdir } = require('fs');
 require('dotenv').load();
 
 // We set up the client and the logger
 const client = new Client();
-require('./src/internal/logger')(client);
+require('./util/logger')(client);
 client.info('Client initialized');
 client.info('Logger initialized');
-
-require('./src/internal/initmongodb')(client);
-client.info('Database initialized');
 
 /** @type {Collection} a collection to store the commands under src/commands */
 client.commands = new Collection();

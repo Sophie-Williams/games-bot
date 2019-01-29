@@ -55,14 +55,18 @@ module.exports = {
       .setDescription(`A list of commands this bot listens to. Type ${prefix}help [__command__] for more info on a given command. \
       The values within the [brackets] are optional.`);
     
-    // For each command, if it is not an alias (copy), we add the prefix followed by the description
+    const games = new RichEmbed().setTitle('Games');
+
+    // For each command, if it is not already in the embed, we add the prefix followed by the description
     client.commands.forEach(cmd => {
-      if (cmd.aliases.includes(cmd)) return;
-      cmds.addField(prefix + cmd.usage, cmd.desc);
+      if (cmds.fields.some(field => field.name === prefix + cmd.usage)) return;
+      // A game is identified by its "type" property
+      (cmd.type ? games : cmds).addField(prefix + cmd.usage, cmd.desc);
     });
 
     // Finally, we send the messages
-    message.channel.send({embed: help});
-    message.channel.send({embed: cmds});
+    message.channel.send({ embed: help });
+    message.channel.send({ embed: cmds });
+    message.channel.send({ embed: games });
   }
 };

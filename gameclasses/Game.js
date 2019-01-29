@@ -17,6 +17,29 @@ class Game {
   }
 
   /**
+   * Responds to a message. Remember, since this is static, this does NOT refer to the game; it refers to the TicTacToeGame object.
+   * @param {Client} client - The logged in client
+   * @param {Message} message - The message to respond to
+   * @param {args} args - The arguments passed by the user
+   * @param {Game} GameType - The class of the game to be instantiated
+   */
+  static generateRunCommand(client, message, args, GameType) {
+    let game = client.games.find(game => game.players.has(message.author.id) && game.type === GameType.type);
+    if (!game) { // If the player is not in a game of this type
+      let id = Math.random().toString(36).substr(2, 9); // We randomly generate an id by getting a random float and mapping each digit to a char value
+      client.games.set(id, new GameType(client, message, args, id));
+      game = client.games.get(id);
+      client.debug(`New ${GameType.type} created`);
+    }
+
+    Object.values(this.options).forEach(opt => {
+      opt.action.call(game, client, message, args);
+    });
+
+    if (game.status !== 'running') game.start(client, message);
+  }
+
+  /**
    * Sends a prompt to the game's channel, with the given reactions as options.
    * @param {Client} client - The logged in client
    * @param {string} str - The simple message to send
@@ -33,7 +56,6 @@ class Game {
     const collected = await msg.awaitReactions(filter, { maxUsers: 1, time: 60 * 1000 });
     if (collected.size === 0) {
       this.sendCollectorEndedMessage(client, 'timed out');
-      return this.end(client);
     }
 
     return collected;
@@ -50,7 +72,7 @@ class Game {
     "${settings.prefix}${this.type} cancel" to cancel this game \
     and then type ${settings.prefix}${this.type} to start a new one.`);
 
-    this.end(client);
+    this.end(client, true);
   }
 
   /**
@@ -59,7 +81,7 @@ class Game {
    * @param {GuildMember} winner 
    * @param {GuildMember} loser 
    */
-  async end(client, winner, loser) {
+  async end(client, suppress, winner, loser) {
     if (winner && loser) { // If the game finished with a winner and loser
       // We update the database with their new scores
       let server = client.mongodb.collection(this.channel.guild.id);
@@ -76,10 +98,14 @@ class Game {
       // If losing means their score goes below 0, we set it to 0, else we decrement it by the score change
       let score = (loserScore - scoreChange < 0) ? 0 : loserScore - scoreChange;
       server.updateOne({ _id: loser.id }, { $set: { score }});
+
+      // I know the tick quotes allow for formatting line breaks but eh this is easier
+      if (!suppress) this.channel.send(`Congrats, ${winner}! You earned ${scoreChange} points.\n` + 
+      `Don't worry about it, ${loser}... You'll get there soon! You lost ${scoreChange} points.`);
     }
 
     this.status = 'ended';
-    this.channel.send(`${this.players.map(p => p.member).join(', ')}, your ${this.type} games have ended.`);
+    if (!suppress) this.channel.send(`${this.players.map(p => p.member).join(', ')}, your ${this.type} games have ended.`);
     client.games.delete(this.id); // Deletes this game from the player's list of games and leaves it to be garbage collected
   }
 

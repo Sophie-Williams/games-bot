@@ -51,7 +51,7 @@ class RockPaperScissorsGame extends Game {
         result += `${players[winner]} won. GG!`;
         message.channel.send(result);
 
-        this.end(client, players[winner], players[1 - winner]);
+        this.end(client, false, players[winner], players[1 - winner]);
       } catch (err) { // Catch if the collector timed out or other errors occurred
         return this.sendCollectorEndedMessage(client, err);
       }
